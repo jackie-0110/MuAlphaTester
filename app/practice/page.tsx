@@ -460,13 +460,18 @@ export default function PracticePage() {
         throw new Error('Invalid streak value')
       }
 
-      // Calculate points
-      const points = calculatePoints(score, questions.length, answerStreak, topicCompletionCount)
-      
-      // Validate points constraint
-      if (points < 0) {
-        console.error('Invalid points value:', points)
-        throw new Error('Invalid points value')
+      // Calculate points using the database function
+      const { data: calculatedPoints, error: pointsError } = await supabase
+        .rpc('calculate_points', {
+          p_score: score,
+          p_total_questions: questions.length,
+          p_answer_streak: answerStreak,
+          p_topic_completion_count: topicCompletionCount
+        })
+
+      if (pointsError) {
+        console.error('Error calculating points:', pointsError)
+        throw pointsError
       }
 
       // Create base timestamp
@@ -481,8 +486,9 @@ export default function PracticePage() {
           grade_level: user.user_metadata?.grade_level || 'Unknown',
           score: score,
           total_questions: questions.length,
-          points: points,
           answer_streak: answerStreak,
+          topic_completion_count: topicCompletionCount,
+          points: calculatedPoints, // Add the calculated points
           type: 'practice',
           completed_at: timestamp.toISOString()
         }
@@ -527,14 +533,14 @@ export default function PracticePage() {
         throw error
       }
 
-      // Update leaderboard
+      // Update leaderboard with the same points
       const leaderboardEntry = {
         user_id: user.id,
         username: user.user_metadata?.username || 'Anonymous',
         division: selectedDivision,
         topic: selectedTopic,
         grade_level: user.user_metadata?.grade_level || 'Unknown',
-        points: points,
+        points: calculatedPoints,
         last_updated: new Date().toISOString()
       }
 
