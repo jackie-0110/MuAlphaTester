@@ -16,6 +16,10 @@ interface Question {
   division: string
   topic: string
   difficulty: number
+  level: number
+  xp_reward: number
+  accuracy_bonus: number
+  stamina_bonus: number
   attempts?: number
   last_attempt?: string
   last_correct?: boolean
@@ -27,6 +31,21 @@ interface StreakData {
   best_streak: number
   answer_streak: number
   best_answer_streak: number
+}
+
+interface TopicProgress {
+  topic: string
+  completed: number
+  total: number
+  status: 'completed' | 'in-progress' | 'not-started'
+}
+
+interface UserStats {
+  level: number
+  xp: number
+  xp_to_next_level: number
+  accuracy: number
+  stamina: number
 }
 
 function KatexContent({ text }: { text: string }) {
@@ -75,10 +94,20 @@ export default function PracticePage() {
   const [showSkipOption, setShowSkipOption] = useState(false)
   const [streakData, setStreakData] = useState<StreakData | null>(null)
   const [topicCompletionCount, setTopicCompletionCount] = useState<number>(0)
+  const [userStats, setUserStats] = useState<UserStats>({
+    level: 1,
+    xp: 0,
+    xp_to_next_level: 100,
+    accuracy: 0,
+    stamina: 0
+  })
+  const [topicProgress, setTopicProgress] = useState<TopicProgress[]>([])
 
   useEffect(() => {
     fetchDivisions()
     fetchStreakData()
+    fetchUserStats()
+    fetchTopicProgress()
   }, [])
 
   useEffect(() => {
@@ -187,10 +216,10 @@ export default function PracticePage() {
       if (!user) return
 
       const { data, error } = await supabase
-        .from('user_progress')
-        .select('completed_at')
+        .from('practice_attempts')
+        .select('created_at, is_correct')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
+        .order('created_at', { ascending: false })
 
       if (error) throw error
 
@@ -207,7 +236,7 @@ export default function PracticePage() {
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
-      const lastPracticeDate = new Date(data[0].completed_at)
+      const lastPracticeDate = new Date(data[0].created_at)
       lastPracticeDate.setHours(0, 0, 0, 0)
 
       const daysSinceLastPractice = Math.floor((today.getTime() - lastPracticeDate.getTime()) / (1000 * 60 * 60 * 24))
@@ -215,37 +244,53 @@ export default function PracticePage() {
       let currentStreak = 1
       let bestStreak = 1
       let tempStreak = 1
+      let currentAnswerStreak = 0
+      let bestAnswerStreak = 0
+      let tempAnswerStreak = 0
 
-      for (let i = 1; i < data.length; i++) {
-        const currentDate = new Date(data[i].completed_at)
-        currentDate.setHours(0, 0, 0, 0)
-        const prevDate = new Date(data[i - 1].completed_at)
-        prevDate.setHours(0, 0, 0, 0)
+      for (let i = 0; i < data.length; i++) {
+        // Calculate practice streak
+        if (i > 0) {
+          const currentDate = new Date(data[i].created_at)
+          currentDate.setHours(0, 0, 0, 0)
+          const prevDate = new Date(data[i - 1].created_at)
+          prevDate.setHours(0, 0, 0, 0)
 
-        const daysBetween = Math.floor((prevDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
-        
-        if (daysBetween === 1) {
-          tempStreak++
-          bestStreak = Math.max(bestStreak, tempStreak)
+          const daysBetween = Math.floor((prevDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
+          
+          if (daysBetween === 1) {
+            tempStreak++
+            bestStreak = Math.max(bestStreak, tempStreak)
+          } else if (daysBetween > 1) {
+            tempStreak = 1
+          }
+        }
+
+        // Calculate answer streak
+        if (data[i].is_correct) {
+          tempAnswerStreak++
+          bestAnswerStreak = Math.max(bestAnswerStreak, tempAnswerStreak)
         } else {
-          tempStreak = 1
+          tempAnswerStreak = 0
         }
       }
 
       if (daysSinceLastPractice === 1) {
-        currentStreak = 1
+        currentStreak = tempStreak
       } else if (daysSinceLastPractice === 0) {
-        currentStreak = 1
+        currentStreak = tempStreak
       } else {
         currentStreak = 0
       }
 
+      currentAnswerStreak = tempAnswerStreak
+
       setStreakData({
         current_streak: currentStreak,
-        last_practice_date: data[0].completed_at,
+        last_practice_date: data[0].created_at,
         best_streak: bestStreak,
-        answer_streak: 0,
-        best_answer_streak: 0
+        answer_streak: currentAnswerStreak,
+        best_answer_streak: bestAnswerStreak
       })
     } catch (error) {
       console.error('Error fetching streak data:', error)
@@ -258,11 +303,11 @@ export default function PracticePage() {
       if (!user || !selectedDivision) return
 
       let query = supabase
-        .from('user_progress')
-        .select('id')
+        .from('practice_attempts')
+        .select('question_id')
         .eq('user_id', user.id)
         .eq('division', selectedDivision)
-        .eq('type', 'practice')
+        .eq('is_correct', true)
 
       if (selectedTopic !== 'All Topics') {
         query = query.eq('topic', selectedTopic)
@@ -272,10 +317,82 @@ export default function PracticePage() {
 
       if (error) throw error
 
-      setTopicCompletionCount(data?.length || 0)
+      // Count unique questions that were answered correctly
+      const uniqueQuestions = new Set(data?.map(attempt => attempt.question_id) || [])
+      setTopicCompletionCount(uniqueQuestions.size)
     } catch (error) {
       console.error('Error fetching topic completion count:', error)
     }
+  }
+
+  const fetchUserStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('level, xp, accuracy, stamina')
+        .eq('id', user.id)
+        .single()
+
+      if (error) throw error
+
+      setUserStats({
+        level: data.level || 1,
+        xp: data.xp || 0,
+        xp_to_next_level: calculateXPForNextLevel(data.level || 1),
+        accuracy: data.accuracy || 0,
+        stamina: data.stamina || 0
+      })
+    } catch (error) {
+      console.error('Error fetching user stats:', error)
+    }
+  }
+
+  const fetchTopicProgress = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: attempts, error } = await supabase
+        .from('practice_attempts')
+        .select('topic, is_correct')
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      // Calculate progress for each topic
+      const progress = topics.map(topic => {
+        const topicAttempts = attempts?.filter(a => a.topic === topic) || []
+        const completed = topicAttempts.filter(a => a.is_correct).length
+        const total = 10 // Assuming 10 questions per topic
+        
+        let status: 'completed' | 'in-progress' | 'not-started'
+        if (completed === total) {
+          status = 'completed'
+        } else if (completed > 0) {
+          status = 'in-progress'
+        } else {
+          status = 'not-started'
+        }
+
+        return {
+          topic,
+          completed,
+          total,
+          status
+        }
+      })
+
+      setTopicProgress(progress)
+    } catch (error) {
+      console.error('Error fetching topic progress:', error)
+    }
+  }
+
+  const calculateXPForNextLevel = (currentLevel: number) => {
+    return Math.floor(100 * Math.pow(1.5, currentLevel - 1))
   }
 
   const startPractice = async () => {
@@ -342,13 +459,18 @@ export default function PracticePage() {
     if (!startTime || showResults) return
 
     const currentQuestionData = questions[currentQuestion]
-    console.log('Current question data:', JSON.stringify(currentQuestionData, null, 2))
-    console.log('User answer:', answer)
-    console.log('Correct answer field:', currentQuestionData.answer)
-    
     const isCorrect = answer === currentQuestionData.answer
-    console.log('Is correct?', isCorrect)
     
+    // Calculate XP and bonuses
+    let xpGained = currentQuestionData.xp_reward || 10
+    if (isCorrect) {
+      xpGained += currentQuestionData.accuracy_bonus || 0
+      if (answerStreak > 0) {
+        xpGained += currentQuestionData.stamina_bonus || 0
+      }
+      setScore(prev => prev + 1)
+    }
+
     // Update answer streak
     if (isCorrect) {
       setAnswerStreak(prev => {
@@ -356,20 +478,41 @@ export default function PracticePage() {
         setBestAnswerStreak(current => Math.max(current, newStreak))
         return newStreak
       })
-      setScore(prev => prev + 1)
     } else {
       setAnswerStreak(0)
+    }
+
+    // Update user stats
+    const newXP = userStats.xp + xpGained
+    const newLevel = userStats.level
+    const xpForNextLevel = calculateXPForNextLevel(newLevel)
+
+    if (newXP >= xpForNextLevel) {
+      // Level up!
+      setUserStats(prev => ({
+        ...prev,
+        level: prev.level + 1,
+        xp: newXP - xpForNextLevel,
+        xp_to_next_level: calculateXPForNextLevel(prev.level + 1)
+      }))
+
+      toast.success(`Level Up! You are now level ${newLevel + 1}`)
+    } else {
+      setUserStats(prev => ({
+        ...prev,
+        xp: newXP
+      }))
     }
     
     // Show feedback
     setFeedback({
       type: isCorrect ? 'correct' : 'incorrect',
       message: isCorrect 
-        ? `Correct! ${answerStreak > 0 ? `(Streak: ${answerStreak + 1})` : ''}` 
+        ? `Correct! +${xpGained} XP ${answerStreak > 0 ? `(Streak: ${answerStreak + 1})` : ''}` 
         : `Incorrect. The correct answer is: ${currentQuestionData.answer}`
     })
 
-    // Update question history locally
+    // Update question history
     setQuestionHistory(prev => ({
       ...prev,
       [currentQuestionData.id]: {
@@ -381,10 +524,8 @@ export default function PracticePage() {
 
     // Check if this is the last question
     if (currentQuestion === questions.length - 1) {
-      console.log('Practice complete! Saving progress...')
       try {
         await saveProgress()
-        console.log('Progress saved successfully')
         setShowResults(true)
       } catch (error) {
         console.error('Failed to save progress:', error)
@@ -393,7 +534,6 @@ export default function PracticePage() {
     } else {
       // Wait 2 seconds before moving to next question
       setTimeout(() => {
-        console.log('Moving to next question:', currentQuestion + 1)
         setCurrentQuestion(prev => prev + 1)
         setUserAnswer('')
         setFeedback(null)
@@ -447,100 +587,46 @@ export default function PracticePage() {
       }
 
       const user = session.user
+      const sessionId = Math.random().toString(36).substring(2, 15) // Generate a unique session ID
 
-      // Validate score constraints
-      if (score < 0 || score > questions.length) {
-        console.error('Invalid score value:', score)
-        throw new Error('Invalid score value')
-      }
+      // Save each question attempt individually
+      for (let i = 0; i < questions.length; i++) {
+        const question = questions[i]
+        const isCorrect = questionHistory[question.id]?.last_correct || false
+        const userAnswer = questionHistory[question.id]?.last_attempt || ''
 
-      // Validate streak constraint
-      if (answerStreak < 0) {
-        console.error('Invalid streak value:', answerStreak)
-        throw new Error('Invalid streak value')
-      }
+        const { error: attemptError } = await supabase
+          .from('practice_attempts')
+          .insert([{
+            user_id: user.id,
+            question_id: question.id,
+            user_answer: userAnswer,
+            is_correct: isCorrect,
+            session_id: sessionId,
+            division: selectedDivision,
+            topic: selectedTopic
+          }])
 
-      // Calculate points using the database function
-      const { data: calculatedPoints, error: pointsError } = await supabase
-        .rpc('calculate_points', {
-          p_score: score,
-          p_total_questions: questions.length,
-          p_answer_streak: answerStreak,
-          p_topic_completion_count: topicCompletionCount
-        })
-
-      if (pointsError) {
-        console.error('Error calculating points:', pointsError)
-        throw pointsError
-      }
-
-      // Create base timestamp
-      const now = new Date()
-      
-      // Function to attempt progress save with timestamp
-      const attemptProgressSave = async (timestamp: Date) => {
-        const practiceSession = {
-          user_id: user.id,
-          division: selectedDivision,
-          topic: selectedTopic,
-          grade_level: user.user_metadata?.grade_level || 'Unknown',
-          score: score,
-          total_questions: questions.length,
-          answer_streak: answerStreak,
-          topic_completion_count: topicCompletionCount,
-          points: calculatedPoints, // Add the calculated points
-          type: 'practice',
-          completed_at: timestamp.toISOString()
+        if (attemptError) {
+          console.error('Error saving question attempt:', attemptError)
+          throw attemptError
         }
-
-        console.log('Attempting to save progress:', practiceSession)
-
-        const { error } = await supabase
-          .from('user_progress')
-          .insert([practiceSession])
-
-        if (error) {
-          console.error('Error saving progress:', error)
-        }
-
-        return error
       }
 
-      // Try to save with current timestamp
-      let error = await attemptProgressSave(now)
-      
-      // If we get a unique constraint violation, try with offset timestamps
-      if (error?.code === '23505') { // unique constraint violation
-        // Try with 1-second increments up to 5 times
-        for (let i = 1; i <= 5; i++) {
-          const offsetTime = new Date(now.getTime() + (i * 1000))
-          error = await attemptProgressSave(offsetTime)
-          
-          if (!error) {
-            break // Successfully saved
-          }
-          
-          if (error.code !== '23505') {
-            throw error // Different error occurred
-          }
-          
-          // If we've tried 5 times and still getting conflicts, throw error
-          if (i === 5) {
-            throw new Error('Unable to save progress: too many attempts within 5 minutes')
-          }
-        }
-      } else if (error) {
-        throw error
-      }
+      // Update leaderboard with aggregated data
+      const totalQuestions = questions.length
+      const correctAnswers = Object.values(questionHistory).filter(h => h.last_correct).length
+      const accuracy = (correctAnswers / totalQuestions) * 100
 
-      // Update leaderboard with the same points
       const leaderboardEntry = {
         user_id: user.id,
         username: user.user_metadata?.username || 'Anonymous',
         division: selectedDivision,
         topic: selectedTopic,
         grade_level: user.user_metadata?.grade_level || 'Unknown',
-        points: calculatedPoints,
+        average_score: accuracy,
+        attempts: totalQuestions,
+        perfect_scores: accuracy === 100 ? 1 : 0,
         last_updated: new Date().toISOString()
       }
 
@@ -644,13 +730,37 @@ export default function PracticePage() {
     <ProtectedRoute>
       <div className="container mx-auto px-4 py-8">
         <Toaster />
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Practice</h1>
-
+        
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6">
             {error}
           </div>
         )}
+
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Practice</h1>
+            {selectedDivision && selectedTopic && (
+              <p className="text-lg text-gray-600">
+                {selectedDivision} - {selectedTopic}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold">
+              {userStats.level}
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">XP to level {userStats.level + 1}</p>
+              <div className="w-48 h-2 bg-gray-200 rounded-full">
+                <div 
+                  className="h-full bg-blue-600 rounded-full"
+                  style={{ width: `${(userStats.xp / userStats.xp_to_next_level) * 100}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Topic Selection Panel */}
@@ -690,7 +800,7 @@ export default function PracticePage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-2xl font-bold text-green-600">{topicCompletionCount}</p>
-                      <p className="text-xs text-green-500">Practice Sessions</p>
+                      <p className="text-xs text-green-500">Questions Completed</p>
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-green-600">
@@ -708,12 +818,12 @@ export default function PracticePage() {
               </div>
 
               <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Division
-              </label>
-              <select
-                value={selectedDivision}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Division
+                  </label>
+                  <select
+                    value={selectedDivision}
                     onChange={(e) => {
                       setSelectedDivision(e.target.value)
                       setSelectedTopic('')
@@ -722,19 +832,19 @@ export default function PracticePage() {
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select a division</option>
-                {divisions.map((division) => (
+                    {divisions.map((division) => (
                       <option key={division} value={division}>
                         {division}
-                  </option>
-                ))}
-              </select>
-            </div>
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Topic
-              </label>
-              <select
+                  </label>
+                  <select
                     value={selectedTopic}
                     onChange={(e) => {
                       setSelectedTopic(e.target.value)
@@ -747,10 +857,10 @@ export default function PracticePage() {
                     {topics.map((topic) => (
                       <option key={topic} value={topic}>
                         {topic}
-                  </option>
-                ))}
-              </select>
-            </div>
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 {selectedDivision && selectedTopic && (
                   <button
@@ -776,10 +886,8 @@ export default function PracticePage() {
                       <p className="text-2xl font-bold text-gray-900">{score}/{questions.length}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Points Earned</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {calculatePoints(score, questions.length, answerStreak, topicCompletionCount)}
-                      </p>
+                      <p className="text-sm text-gray-500">XP Earned</p>
+                      <p className="text-2xl font-bold text-blue-600">+{userStats.xp}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Best Streak</p>
@@ -790,7 +898,7 @@ export default function PracticePage() {
                       <p className="text-2xl font-bold text-gray-900">{topicCompletionCount}</p>
                     </div>
                   </div>
-          <button
+                  <button
                     onClick={() => {
                       setPracticeComplete(false)
                       setShowResults(false)
@@ -798,24 +906,26 @@ export default function PracticePage() {
                     className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
                     Try Again
-          </button>
+                  </button>
                 </div>
               ) : (
                 <div className="bg-white p-6 rounded-lg shadow-lg">
                   <div className="mb-6">
                     <div className="flex justify-between items-center mb-4">
-                      <div className="text-sm text-gray-500">
-                        Question {currentQuestion + 1} of {questions.length}
-                      </div>
                       <div className="flex items-center space-x-4">
                         <div className="text-sm text-gray-500">
-                          Current Streak: <span className="font-semibold text-blue-600">{answerStreak}</span>
+                          Question {currentQuestion + 1} of {questions.length}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          Best Streak: <span className="font-semibold text-green-600">{streakData?.best_streak}</span>
+                        <div className="text-blue-600">
+                          +{questions[currentQuestion]?.xp_reward || 10} XP
                         </div>
-                </div>
-              </div>
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        Accuracy +{questions[currentQuestion]?.accuracy_bonus || 0}
+                        {answerStreak > 0 && `, Stamina +${questions[currentQuestion]?.stamina_bonus || 0}`}
+                      </div>
+                    </div>
+
                     {questions[currentQuestion] && (
                       <>
                         {questionHistory[questions[currentQuestion].id] && (
@@ -824,12 +934,12 @@ export default function PracticePage() {
                               Previous attempts: {questionHistory[questions[currentQuestion].id].attempts}
                               {questionHistory[questions[currentQuestion].id].last_correct && ' (Last attempt was correct)'}
                             </p>
-              </div>
+                          </div>
                         )}
                         <p className="text-lg font-medium text-gray-900 mb-4">
                           {renderLatex(questions[currentQuestion].question_text)}
                         </p>
-              <div className="space-y-4">
+                        <div className="space-y-4">
                           {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 && (
                             <div className="space-y-2">
                               {questions[currentQuestion].options.map((option, index) => (
@@ -841,10 +951,10 @@ export default function PracticePage() {
                             </div>
                           )}
                           <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
+                            <input
+                              type="text"
+                              value={userAnswer}
+                              onChange={(e) => setUserAnswer(e.target.value)}
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter' && !isAnswerSubmitted) {
                                   handleAnswer(userAnswer)
@@ -865,7 +975,7 @@ export default function PracticePage() {
                             >
                               Submit
                             </button>
-                </div>
+                          </div>
                           {showSkipOption && (
                             <button
                               onClick={skipQuestion}
@@ -875,7 +985,7 @@ export default function PracticePage() {
                             </button>
                           )}
                           {feedback && (
-                  <div className={`p-4 rounded-lg ${
+                            <div className={`p-4 rounded-lg ${
                               feedback.type === 'correct' 
                                 ? 'bg-green-50 text-green-700 border border-green-200' 
                                 : 'bg-red-50 text-red-700 border border-red-200'
@@ -893,12 +1003,12 @@ export default function PracticePage() {
               <div className="bg-white p-6 rounded-lg shadow-lg">
                 <div className="text-center text-gray-500">
                   <p className="text-lg">Select a division and topic to start practicing</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
     </ProtectedRoute>
   )
 } 
