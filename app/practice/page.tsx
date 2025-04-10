@@ -183,6 +183,7 @@ export default function PracticePage() {
         .eq('user_id', user.id)
         .eq('division', selectedDivision)
         .order('timestamp', { ascending: false })
+        
 
       if (selectedTopic !== 'All Topics') {
         query = query.eq('topic', selectedTopic)

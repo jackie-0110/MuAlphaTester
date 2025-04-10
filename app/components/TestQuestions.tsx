@@ -45,6 +45,7 @@ export function TestQuestions() {
   const [difficultyRange, setDifficultyRange] = useState<[number, number]>([0, 10])
   const [numProblems, setNumProblems] = useState<number>(5)
   const topicInputRef = useRef<HTMLDivElement>(null)
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     fetchDivisions()
@@ -55,6 +56,33 @@ export function TestQuestions() {
       fetchTopics(selectedDivision)
     }
   }, [selectedDivision])
+
+  const handlePrint = () => {
+    setIsPrinting(true);
+    
+    // Use setTimeout to ensure the state updates before printing
+    setTimeout(() => {
+      window.print();
+      // Return to normal view after print dialog closes
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 500);
+    }, 100);
+  };
+
+
+  useEffect(() => {
+    if (isPrinting) {
+      // Add a class to the body for print-specific CSS
+      document.body.classList.add('printing-mode');
+    } else {
+      document.body.classList.remove('printing-mode');
+    }
+    
+    return () => {
+      document.body.classList.remove('printing-mode');
+    };
+  }, [isPrinting]);
 
   const fetchDivisions = async () => {
     try {
@@ -289,7 +317,7 @@ export function TestQuestions() {
 
       {/* Questions Display */}
       {Array.isArray(questions) && questions.length > 0 ? (
-        <div className="printable-test bg-white p-6 rounded-lg shadow-lg">
+        <div className={`printable-test bg-white p-6 rounded-lg shadow-lg ${isPrinting ? 'print-view' : ''}`}>
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-2">Problem Set</h2>
             <p className="text-gray-600">
@@ -317,6 +345,14 @@ export function TestQuestions() {
           </div>
         </div>
       ) : null}
+      
+      {/* Only show additional UI elements when not printing */}
+      {!isPrinting && (
+        // Your other UI elements like answer inputs, submit buttons, etc.
+        <div className="mt-4">
+          {/* Other content */}
+        </div>
+      )}
     </div>
-  )
-} 
+  );
+}
