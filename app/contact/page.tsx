@@ -1,8 +1,8 @@
 'use client';
 
 
-import { useAuth } from '../../contexts/AuthContext'
-
+// import { useAuth } from '../../contexts/AuthContext'
+import { Info } from '../../components/Info'
 
 export default function ContactPage() {
   return (
