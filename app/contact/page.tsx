@@ -2,7 +2,7 @@
 
 
 // import { useAuth } from '../../contexts/AuthContext'
-import { Info } from '../../components/Info'
+import Info from '../../components/Info'
 
 export default function ContactPage() {
   return (
