@@ -146,7 +146,7 @@ export function TestQuestions() {
         .in('topic', selectedTopics)
         .gte('difficulty', difficultyRange[0])
         .lte('difficulty', difficultyRange[1])
-        .order('id') // Remove the useRandom property that was causing the error
+        .order('id') 
         .limit(fetchCount)
 
       const { data, error } = await query
@@ -347,11 +347,26 @@ export function TestQuestions() {
       {/* Questions Display */}
       {Array.isArray(questions) && questions.length > 0 ? (
         <div className={`printable-test ${isPrinting ? 'print-view' : 'bg-white p-6 rounded-lg shadow-lg'}`}>
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold mb-2">Problem Set</h2>
-            <p className="text-gray-600">
-              {selectedDivision} - {selectedTopics.join(', ')}
-            </p>
+          <div className="mb-8 flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Problem Set</h2>
+              <p className="text-gray-600">
+                {selectedDivision} - {selectedTopics.join(', ')}
+              </p>
+            </div>
+            
+            {/* Print Button - Only show when not in printing mode */}
+            {!isPrinting && (
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Problem Set
+              </button>
+            )}
           </div>
 
           <div className="space-y-8">
@@ -372,21 +387,6 @@ export function TestQuestions() {
               </div>
             ))}
           </div>
-          
-          {/* Print Button - Only show when not in printing mode */}
-          {!isPrinting && (
-            <div className="mt-8 flex justify-end">
-              <button
-                onClick={handlePrint}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print Problem Set
-              </button>
-            </div>
-          )}
         </div>
       ) : null}
     </div>
