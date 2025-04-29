@@ -38,13 +38,12 @@ export function TestQuestions() {
   const [divisions, setDivisions] = useState<string[]>([])
   const [topics, setTopics] = useState<string[]>([])
   const [selectedDivision, setSelectedDivision] = useState<string>('')
-  const [selectedTopic, setSelectedTopic] = useState<string>('')
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([])
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [difficultyRange, setDifficultyRange] = useState<[number, number]>([0, 10])
   const [numProblems, setNumProblems] = useState<number>(5)
-  const topicInputRef = useRef<HTMLDivElement>(null)
   const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
@@ -57,23 +56,8 @@ export function TestQuestions() {
     }
   }, [selectedDivision])
 
-  const handlePrint = () => {
-    setIsPrinting(true);
-    
-    // Use setTimeout to ensure the state updates before printing
-    setTimeout(() => {
-      window.print();
-      // Return to normal view after print dialog closes
-      setTimeout(() => {
-        setIsPrinting(false);
-      }, 500);
-    }, 100);
-  };
-
-
   useEffect(() => {
     if (isPrinting) {
-      // Add a class to the body for print-specific CSS
       document.body.classList.add('printing-mode');
     } else {
       document.body.classList.remove('printing-mode');
@@ -115,7 +99,7 @@ export function TestQuestions() {
 
       const uniqueTopics = [...new Set(data.map(t => t.topic))]
       setTopics(uniqueTopics)
-      setSelectedTopic('')
+      setSelectedTopics([])
     } catch (error) {
       console.error('Error fetching topics:', error)
       setError('Failed to load topics')
@@ -136,8 +120,8 @@ export function TestQuestions() {
   }
 
   const fetchQuestions = async () => {
-    if (!selectedDivision || !selectedTopic) {
-      setError('Please select both a division and topic')
+    if (!selectedDivision || selectedTopics.length === 0) {
+      setError('Please select a division and at least one topic')
       return
     }
 
@@ -147,20 +131,23 @@ export function TestQuestions() {
 
       console.log('Fetching questions with params:', {
         division: selectedDivision,
-        topic: selectedTopic,
+        topics: selectedTopics,
         difficultyRange,
         numProblems
       })
 
+      // Fetch more questions than needed to ensure we have enough to randomize
+      const fetchCount = Math.min(numProblems * 3, 100); // Limit to 100 max for performance
+      
       let query = supabase
         .from('questions')
         .select('id, division, topic, difficulty, question_text, answer, options')
         .eq('division', selectedDivision)
-        .eq('topic', selectedTopic)
+        .in('topic', selectedTopics)
         .gte('difficulty', difficultyRange[0])
         .lte('difficulty', difficultyRange[1])
-        .order('id', { useRandom: true })
-        .limit(numProblems)
+        .order('id') // Remove the useRandom property that was causing the error
+        .limit(fetchCount)
 
       const { data, error } = await query
 
@@ -183,8 +170,18 @@ export function TestQuestions() {
         question_text: question.question_text || '',
       }))
 
-      console.log('Validated questions:', validatedQuestions)
-      setQuestions(validatedQuestions)
+      // Randomize the questions using Fisher-Yates shuffle algorithm
+      const shuffledQuestions = [...validatedQuestions];
+      for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
+      }
+
+      // Take only the number of problems requested
+      const selectedQuestions = shuffledQuestions.slice(0, numProblems);
+
+      console.log('Randomized questions:', selectedQuestions)
+      setQuestions(selectedQuestions)
     } catch (error) {
       console.error('Error fetching questions:', error)
       setError('Failed to load questions: ' + (error instanceof Error ? error.message : 'Unknown error'))
@@ -193,123 +190,155 @@ export function TestQuestions() {
     }
   }
 
+  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const options = e.target.options;
+    const selectedValues: string[] = [];
+    
+    for (let i = 0; i < options.length; i++) {
+      if (options[i].selected) {
+        selectedValues.push(options[i].value);
+      }
+    }
+    
+    setSelectedTopics(selectedValues);
+  }
+
+  const handlePrint = () => {
+    setIsPrinting(true);
+    
+    // Use setTimeout to ensure the state updates before printing
+    setTimeout(() => {
+      window.print();
+      // Return to normal view after print dialog closes
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 500);
+    }, 100);
+  };
+
   return (
     <div className="space-y-8">
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-bold mb-6">Generate Problem Set</h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Division Selection */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Division</h3>
-            <select
-              value={selectedDivision}
-              onChange={(e) => setSelectedDivision(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">Select a division</option>
-              {divisions.map((division) => (
-                <option key={division} value={division}>
-                  {division}
-                </option>
-              ))}
-            </select>
+      {/* Only show controls when not printing */}
+      {!isPrinting && (
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <h2 className="text-2xl font-bold mb-6">Generate Problem Set</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            {/* Division Selection */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Division</h3>
+              <select
+                value={selectedDivision}
+                onChange={(e) => setSelectedDivision(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select a division</option>
+                {divisions.map((division) => (
+                  <option key={division} value={division}>
+                    {division}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Topic Selection - Multiple Select */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Topics (Hold Ctrl/Cmd to select multiple)</h3>
+              <select
+                multiple
+                value={selectedTopics}
+                onChange={handleTopicChange}
+                disabled={!selectedDivision}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 min-h-[120px]"
+              >
+                {topics.map((topic) => (
+                  <option key={topic} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                {selectedTopics.length} topic(s) selected
+              </p>
+            </div>
           </div>
 
-          {/* Topic Selection */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Topic</h3>
-            <select
-              value={selectedTopic}
-              onChange={(e) => setSelectedTopic(e.target.value)}
-              disabled={!selectedDivision}
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50"
-            >
-              <option value="">Select a topic</option>
-              {topics.map((topic) => (
-                <option key={topic} value={topic}>
-                  {topic}
-                </option>
-              ))}
-            </select>
+          {/* Difficulty Range Slider */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Difficulty range</h3>
+            <div className="relative h-2 mb-8">
+              <div className="absolute w-full h-full bg-gray-200 rounded-lg"></div>
+              <div 
+                className="absolute h-full bg-teal-500 rounded-lg"
+                style={{
+                  left: `${(difficultyRange[0] / 10) * 100}%`,
+                  right: `${100 - (difficultyRange[1] / 10) * 100}%`
+                }}
+              ></div>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value={difficultyRange[0]}
+                onChange={(e) => handleDifficultyChange(e, 'min')}
+                className="absolute w-full h-full appearance-none bg-transparent pointer-events-auto cursor-pointer"
+              />
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="1"
+                value={difficultyRange[1]}
+                onChange={(e) => handleDifficultyChange(e, 'max')}
+                className="absolute w-full h-full appearance-none bg-transparent pointer-events-auto cursor-pointer"
+              />
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>{difficultyRange[0]}</span>
+              <span>{difficultyRange[1]}</span>
+            </div>
           </div>
+
+          {/* Number of Problems Slider */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-2"># of problems</h3>
+            <div className="flex items-center space-x-4">
+              <input
+                type="range"
+                min="0"
+                max="40"
+                step="1"
+                value={numProblems}
+                onChange={(e) => setNumProblems(parseInt(e.target.value))}
+                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <span className="text-sm text-gray-600 min-w-[2rem] text-center">
+                {numProblems}
+              </span>
+            </div>
+          </div>
+
+          {/* Generate Button */}
+          <button
+            onClick={fetchQuestions}
+            disabled={!selectedDivision || selectedTopics.length === 0}
+            className="w-full px-6 py-3 bg-teal-500 text-white text-lg font-semibold rounded-lg hover:bg-teal-600 disabled:opacity-50 transition-colors"
+          >
+            Generate Problem Set
+          </button>
         </div>
-
-        {/* Difficulty Range Slider */}
-        <div className="mb-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Difficulty range</h3>
-          <div className="relative h-2 mb-8">
-            <div className="absolute w-full h-full bg-gray-200 rounded-lg"></div>
-            <div 
-              className="absolute h-full bg-teal-500 rounded-lg"
-              style={{
-                left: `${(difficultyRange[0] / 10) * 100}%`,
-                right: `${100 - (difficultyRange[1] / 10) * 100}%`
-              }}
-            ></div>
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="1"
-              value={difficultyRange[0]}
-              onChange={(e) => handleDifficultyChange(e, 'min')}
-              className="absolute w-full h-full appearance-none bg-transparent pointer-events-auto cursor-pointer"
-            />
-            <input
-              type="range"
-              min="0"
-              max="10"
-              step="1"
-              value={difficultyRange[1]}
-              onChange={(e) => handleDifficultyChange(e, 'max')}
-              className="absolute w-full h-full appearance-none bg-transparent pointer-events-auto cursor-pointer"
-            />
-          </div>
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>{difficultyRange[0]}</span>
-            <span>{difficultyRange[1]}</span>
-          </div>
-        </div>
-
-        {/* Number of Problems Slider */}
-        <div className="mb-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-2"># of problems</h3>
-          <div className="flex items-center space-x-4">
-            <input
-              type="range"
-              min="0"
-              max="40"
-              step="1"
-              value={numProblems}
-              onChange={(e) => setNumProblems(parseInt(e.target.value))}
-              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            />
-            <span className="text-sm text-gray-600 min-w-[2rem] text-center">
-              {numProblems}
-            </span>
-          </div>
-        </div>
-
-        {/* Generate Button */}
-        <button
-          onClick={fetchQuestions}
-          disabled={!selectedDivision || !selectedTopic}
-          className="w-full px-6 py-3 bg-teal-500 text-white text-lg font-semibold rounded-lg hover:bg-teal-600 disabled:opacity-50 transition-colors"
-        >
-          Generate Problem Set
-        </button>
-      </div>
+      )}
 
       {/* Loading State */}
-      {loading && !questions.length && (
+      {loading && !questions.length && !isPrinting && (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       )}
 
       {/* Error State */}
-      {error && (
+      {error && !isPrinting && (
         <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg">
           {error}
         </div>
@@ -317,11 +346,11 @@ export function TestQuestions() {
 
       {/* Questions Display */}
       {Array.isArray(questions) && questions.length > 0 ? (
-        <div className={`printable-test bg-white p-6 rounded-lg shadow-lg ${isPrinting ? 'print-view' : ''}`}>
+        <div className={`printable-test ${isPrinting ? 'print-view' : 'bg-white p-6 rounded-lg shadow-lg'}`}>
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-2">Problem Set</h2>
             <p className="text-gray-600">
-              {selectedDivision} - {selectedTopic}
+              {selectedDivision} - {selectedTopics.join(', ')}
             </p>
           </div>
 
@@ -343,16 +372,23 @@ export function TestQuestions() {
               </div>
             ))}
           </div>
+          
+          {/* Print Button - Only show when not in printing mode */}
+          {!isPrinting && (
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                Print Problem Set
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
-      
-      {/* Only show additional UI elements when not printing */}
-      {!isPrinting && (
-        // Your other UI elements like answer inputs, submit buttons, etc.
-        <div className="mt-4">
-          {/* Other content */}
-        </div>
-      )}
     </div>
   );
 }

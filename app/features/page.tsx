@@ -2,7 +2,7 @@
 
 
 import Info from '@/components/Info';
-import Link from 'next/link';
+// import Link from 'next/link';
 
 export default function FeaturesPage() {
   return (

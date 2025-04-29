@@ -46,3 +46,51 @@ body {
     @apply text-gray-900;
   }
 }
+
+/* Print styles */
+@media print {
+  /* Hide all elements by default */
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the print view and its children */
+  .print-view,
+  .print-view * {
+    visibility: visible;
+  }
+
+  /* Position the print view */
+  .print-view {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+  }
+
+  /* Basic print styling */
+  .print-view {
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-view .question-item {
+    page-break-inside: avoid;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+  }
+
+  /* Hide interactive elements */
+  .print-view button,
+  .print-view input,
+  .print-view select {
+    display: none !important;
+  }
+
+  /* Ensure KaTeX renders properly */
+  .print-view .katex {
+    font-size: 1.1em !important;
+  }
+}

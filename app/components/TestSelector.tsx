@@ -41,7 +41,11 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
 
       const uniqueDivisions = [...new Set(data.map((d: { division: string }) => d.division))].sort()
       setDivisions(uniqueDivisions)
-      setFilteredOptions(uniqueDivisions)
+      // Set the first division as selected by default
+      if (uniqueDivisions.length > 0) {
+        setSelectedDivision(uniqueDivisions[0])
+        fetchTopics(uniqueDivisions[0])
+      }
     } catch (error) {
       console.error('Error fetching divisions:', error)
     }
@@ -71,9 +75,8 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
     setInputValue(value)
     setShowOptions(true)
 
-    // Filter options based on input
-    const options = selectedDivision ? topics : divisions
-    const filtered = options.filter(option => 
+    // Filter topics based on input
+    const filtered = topics.filter(option => 
       option.toLowerCase().includes(value.toLowerCase())
     )
     setFilteredOptions(filtered)
@@ -81,15 +84,9 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
 
   // Handle option selection
   const handleOptionSelect = (option: string) => {
-    if (!selectedDivision) {
-      setSelectedDivision(option)
-      setInputValue('')
-      onSelect({ division: option, topic: null })
-    } else {
-      setSelectedTopic(option)
-      setShowOptions(false)
-      onSelect({ division: selectedDivision, topic: option === 'All Topics' ? null : option })
-    }
+    setSelectedTopic(option)
+    setShowOptions(false)
+    onSelect({ division: selectedDivision!, topic: option === 'All Topics' ? null : option })
   }
 
   // Handle clicks outside the component
@@ -108,31 +105,13 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
   return (
     <div className={`relative ${className}`}>
       <div className="flex items-center space-x-2">
-        {selectedDivision && (
-          <div className="flex items-center">
-            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
-              {selectedDivision}
-            </span>
-            <button 
-              onClick={() => {
-                setSelectedDivision(null)
-                setSelectedTopic(null)
-                setInputValue('')
-                setFilteredOptions(divisions)
-              }}
-              className="ml-2 text-gray-500 hover:text-gray-700"
-            >
-              ×
-            </button>
-          </div>
-        )}
         <input
           ref={inputRef}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
           onFocus={() => setShowOptions(true)}
-          placeholder={selectedDivision ? "Select topic (or leave empty for all)" : "Select division"}
+          placeholder="Select topic (or leave empty for all)"
           className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>

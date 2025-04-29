@@ -89,7 +89,7 @@ export default function PracticePage() {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'incorrect', message: string } | null>(null)
   const [answerStreak, setAnswerStreak] = useState(0)
-  const [bestAnswerStreak, setBestAnswerStreak] = useState(0)
+  // const [bestAnswerStreak, setBestAnswerStreak] = useState(0)
   const [questionHistory, setQuestionHistory] = useState<Record<string, { attempts: number, last_attempt: string, last_correct: boolean }>>({})
   const [showSkipOption, setShowSkipOption] = useState(false)
   const [streakData, setStreakData] = useState<StreakData | null>(null)
@@ -819,12 +819,12 @@ export default function PracticePage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Division
-                  </label>
-                  <select
-                    value={selectedDivision}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Division
+              </label>
+              <select
+                value={selectedDivision}
                     onChange={(e) => {
                       setSelectedDivision(e.target.value)
                       setSelectedTopic('')
@@ -833,19 +833,19 @@ export default function PracticePage() {
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select a division</option>
-                    {divisions.map((division) => (
+                {divisions.map((division) => (
                       <option key={division} value={division}>
                         {division}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                     Topic
-                  </label>
-                  <select
+              </label>
+              <select
                     value={selectedTopic}
                     onChange={(e) => {
                       setSelectedTopic(e.target.value)
@@ -858,10 +858,10 @@ export default function PracticePage() {
                     {topics.map((topic) => (
                       <option key={topic} value={topic}>
                         {topic}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  </option>
+                ))}
+              </select>
+            </div>
 
                 {selectedDivision && selectedTopic && (
                   <button
@@ -899,7 +899,7 @@ export default function PracticePage() {
                       <p className="text-2xl font-bold text-gray-900">{topicCompletionCount}</p>
                     </div>
                   </div>
-                  <button
+          <button
                     onClick={() => {
                       setPracticeComplete(false)
                       setShowResults(false)
@@ -907,7 +907,7 @@ export default function PracticePage() {
                     className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
                     Try Again
-                  </button>
+          </button>
                 </div>
               ) : (
                 <div className="bg-white p-6 rounded-lg shadow-lg">
@@ -924,8 +924,8 @@ export default function PracticePage() {
                       <div className="text-sm text-gray-500">
                         Accuracy +{questions[currentQuestion]?.accuracy_bonus || 0}
                         {answerStreak > 0 && `, Stamina +${questions[currentQuestion]?.stamina_bonus || 0}`}
-                      </div>
-                    </div>
+                </div>
+              </div>
 
                     {questions[currentQuestion] && (
                       <>
@@ -935,12 +935,12 @@ export default function PracticePage() {
                               Previous attempts: {questionHistory[questions[currentQuestion].id].attempts}
                               {questionHistory[questions[currentQuestion].id].last_correct && ' (Last attempt was correct)'}
                             </p>
-                          </div>
+              </div>
                         )}
                         <p className="text-lg font-medium text-gray-900 mb-4">
                           {renderLatex(questions[currentQuestion].question_text)}
                         </p>
-                        <div className="space-y-4">
+              <div className="space-y-4">
                           {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 && (
                             <div className="space-y-2">
                               {questions[currentQuestion].options.map((option, index) => (
@@ -952,10 +952,10 @@ export default function PracticePage() {
                             </div>
                           )}
                           <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={userAnswer}
-                              onChange={(e) => setUserAnswer(e.target.value)}
+                  <input
+                    type="text"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
                               onKeyPress={(e) => {
                                 if (e.key === 'Enter' && !isAnswerSubmitted) {
                                   handleAnswer(userAnswer)
@@ -976,7 +976,7 @@ export default function PracticePage() {
                             >
                               Submit
                             </button>
-                          </div>
+                </div>
                           {showSkipOption && (
                             <button
                               onClick={skipQuestion}
@@ -986,7 +986,7 @@ export default function PracticePage() {
                             </button>
                           )}
                           {feedback && (
-                            <div className={`p-4 rounded-lg ${
+                  <div className={`p-4 rounded-lg ${
                               feedback.type === 'correct' 
                                 ? 'bg-green-50 text-green-700 border border-green-200' 
                                 : 'bg-red-50 text-red-700 border border-red-200'
@@ -1004,12 +1004,12 @@ export default function PracticePage() {
               <div className="bg-white p-6 rounded-lg shadow-lg">
                 <div className="text-center text-gray-500">
                   <p className="text-lg">Select a division and topic to start practicing</p>
-                </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
     </ProtectedRoute>
   )
 } 
