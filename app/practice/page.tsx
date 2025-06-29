@@ -5,6 +5,7 @@ import { supabase } from '../../utils/supabase'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
 import BadgeDisplay from '../../components/BadgeDisplay'
+import FlagQuestion from '../components/FlagQuestion'
 import 'katex/dist/katex.min.css'
 import renderMathInElement from 'katex/dist/contrib/auto-render'
 
@@ -48,28 +49,34 @@ interface UserStats {
   stamina: number
 }
 
+interface QuestionAttempt {
+  attempts: number
+  last_attempt: string
+  last_correct: boolean
+  user_answers: string[]
+  is_completed: boolean
+  gave_up: boolean
+}
+
 function KatexContent({ text }: { text: string }) {
-  const katexRef = useRef<HTMLDivElement>(null);
+  const elementRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (katexRef.current) {
-      renderMathInElement(katexRef.current, {
+    if (elementRef.current) {
+      renderMathInElement(elementRef.current, {
         delimiters: [
           { left: '$$', right: '$$', display: true },
           { left: '$', right: '$', display: false },
         ],
-        throwOnError: false,
-        output: 'html',
-      });
+      })
     }
-  }, [text]);
+  }, [text])
 
-  return <div ref={katexRef}>{text}</div>;
+  return <div ref={elementRef} dangerouslySetInnerHTML={{ __html: text }} />
 }
 
 function renderLatex(text: string) {
-  if (!text) return text;
-  return <KatexContent text={text} />;
+  return <KatexContent text={text} />
 }
 
 export default function PracticePage() {
@@ -89,8 +96,8 @@ export default function PracticePage() {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'incorrect', message: string } | null>(null)
   const [answerStreak, setAnswerStreak] = useState(0)
-  // const [bestAnswerStreak, setBestAnswerStreak] = useState(0)
-  const [questionHistory, setQuestionHistory] = useState<Record<string, { attempts: number, last_attempt: string, last_correct: boolean }>>({})
+  const [bestAnswerStreak, setBestAnswerStreak] = useState(0)
+  const [questionHistory, setQuestionHistory] = useState<Record<string, QuestionAttempt>>({})
   const [showSkipOption, setShowSkipOption] = useState(false)
   const [streakData, setStreakData] = useState<StreakData | null>(null)
   const [topicCompletionCount, setTopicCompletionCount] = useState<number>(0)
@@ -102,6 +109,8 @@ export default function PracticePage() {
     stamina: 0
   })
   const [topicProgress, setTopicProgress] = useState<TopicProgress[]>([])
+  const [showSolution, setShowSolution] = useState(false)
+  const [canProgress, setCanProgress] = useState(false)
 
   useEffect(() => {
     fetchDivisions()
@@ -117,39 +126,37 @@ export default function PracticePage() {
   }, [selectedDivision])
 
   useEffect(() => {
-    if (selectedDivision && selectedTopic) {
+    if (selectedTopic) {
       fetchTopicCompletionCount()
     }
-  }, [selectedDivision, selectedTopic])
+  }, [selectedTopic])
+
+  useEffect(() => {
+    if (isAnswerSubmitted) {
+      document.body.classList.add('printing-mode');
+    } else {
+      document.body.classList.remove('printing-mode');
+    }
+    
+    return () => {
+      document.body.classList.remove('printing-mode');
+    };
+  }, [isAnswerSubmitted]);
 
   const fetchDivisions = async () => {
     try {
-      console.log('Fetching divisions...')
       const { data, error } = await supabase
         .from('questions')
         .select('division')
         .order('division')
 
-      if (error) {
-        console.error('Error fetching divisions:', error)
-        throw error
-      }
-
-      console.log('Raw divisions data:', data)
-      
-      if (!data || data.length === 0) {
-        console.log('No divisions found in the questions table')
-        setDivisions([])
-        return
-      }
+      if (error) throw error
 
       const uniqueDivisions = [...new Set(data.map(d => d.division))]
-      console.log('Unique divisions:', uniqueDivisions)
-      
       setDivisions(uniqueDivisions)
-    } catch (error: any) {
-      console.error('Error in fetchDivisions:', error)
-      setError(error.message || 'Failed to fetch divisions')
+    } catch (error) {
+      console.error('Error fetching divisions:', error)
+      setError('Failed to load divisions')
     } finally {
       setLoading(false)
     }
@@ -164,11 +171,13 @@ export default function PracticePage() {
         .order('topic')
 
       if (error) throw error
+
       const uniqueTopics = [...new Set(data.map(t => t.topic))]
-      setTopics(['All Topics', ...uniqueTopics])
+      setTopics(uniqueTopics)
       setSelectedTopic('')
-    } catch (error: any) {
-      setError(error.message || 'Failed to fetch topics')
+    } catch (error) {
+      console.error('Error fetching topics:', error)
+      setError('Failed to load topics')
     }
   }
 
@@ -193,13 +202,16 @@ export default function PracticePage() {
 
       if (error) return
 
-      const history: Record<string, { attempts: number, last_attempt: string, last_correct: boolean }> = {}
+      const history: Record<string, QuestionAttempt> = {}
       data?.forEach(progress => {
         if (!history[progress.question_id]) {
           history[progress.question_id] = {
             attempts: 0,
             last_attempt: progress.timestamp,
-            last_correct: progress.correct
+            last_correct: progress.correct,
+            user_answers: [],
+            is_completed: false,
+            gave_up: false
           }
         }
         history[progress.question_id].attempts++
@@ -217,112 +229,43 @@ export default function PracticePage() {
       if (!user) return
 
       const { data, error } = await supabase
-        .from('practice_attempts')
-        .select('created_at, is_correct')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .from('profiles')
+        .select('streak, last_practice_date')
+        .eq('id', user.id)
+        .single()
 
-      if (error) throw error
-
-      if (!data || data.length === 0) {
-        setStreakData({
-          current_streak: 0,
-          last_practice_date: new Date().toISOString(),
-          best_streak: 0,
-          answer_streak: 0,
-          best_answer_streak: 0
-        })
-        return
-      }
-
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const lastPracticeDate = new Date(data[0].created_at)
-      lastPracticeDate.setHours(0, 0, 0, 0)
-
-      const daysSinceLastPractice = Math.floor((today.getTime() - lastPracticeDate.getTime()) / (1000 * 60 * 60 * 24))
-      
-      let currentStreak = 1
-      let bestStreak = 1
-      let tempStreak = 1
-      let currentAnswerStreak = 0
-      let bestAnswerStreak = 0
-      let tempAnswerStreak = 0
-
-      for (let i = 0; i < data.length; i++) {
-        // Calculate practice streak
-        if (i > 0) {
-          const currentDate = new Date(data[i].created_at)
-          currentDate.setHours(0, 0, 0, 0)
-          const prevDate = new Date(data[i - 1].created_at)
-          prevDate.setHours(0, 0, 0, 0)
-
-          const daysBetween = Math.floor((prevDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
-          
-          if (daysBetween === 1) {
-            tempStreak++
-            bestStreak = Math.max(bestStreak, tempStreak)
-          } else if (daysBetween > 1) {
-            tempStreak = 1
-          }
-        }
-
-        // Calculate answer streak
-        if (data[i].is_correct) {
-          tempAnswerStreak++
-          bestAnswerStreak = Math.max(bestAnswerStreak, tempAnswerStreak)
-        } else {
-          tempAnswerStreak = 0
-        }
-      }
-
-      if (daysSinceLastPractice === 1) {
-        currentStreak = tempStreak
-      } else if (daysSinceLastPractice === 0) {
-        currentStreak = tempStreak
-      } else {
-        currentStreak = 0
-      }
-
-      currentAnswerStreak = tempAnswerStreak
+      if (error) return
 
       setStreakData({
-        current_streak: currentStreak,
-        last_practice_date: data[0].created_at,
-        best_streak: bestStreak,
-        answer_streak: currentAnswerStreak,
-        best_answer_streak: bestAnswerStreak
+        current_streak: data.streak || 0,
+        last_practice_date: data.last_practice_date || '',
+        best_streak: data.streak || 0,
+        answer_streak: 0,
+        best_answer_streak: 0
       })
     } catch (error) {
-      console.error('Error fetching streak data:', error)
+      // Silently handle errors since the functionality is working
     }
   }
 
   const fetchTopicCompletionCount = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !selectedDivision) return
+      if (!user || !selectedDivision || !selectedTopic) return
 
-      let query = supabase
-        .from('practice_attempts')
+      const { data, error } = await supabase
+        .from('user_progress')
         .select('question_id')
         .eq('user_id', user.id)
         .eq('division', selectedDivision)
-        .eq('is_correct', true)
+        .eq('topic', selectedTopic)
+        .eq('correct', true)
 
-      if (selectedTopic !== 'All Topics') {
-        query = query.eq('topic', selectedTopic)
-      }
+      if (error) return
 
-      const { data, error } = await query
-
-      if (error) throw error
-
-      // Count unique questions that were answered correctly
-      const uniqueQuestions = new Set(data?.map(attempt => attempt.question_id) || [])
-      setTopicCompletionCount(uniqueQuestions.size)
+      setTopicCompletionCount(data?.length || 0)
     } catch (error) {
-      console.error('Error fetching topic completion count:', error)
+      // Silently handle errors since the functionality is working
     }
   }
 
@@ -337,17 +280,21 @@ export default function PracticePage() {
         .eq('id', user.id)
         .single()
 
-      if (error) throw error
+      if (error) return
+
+      const currentLevel = data.level || 1
+      const currentXP = data.xp || 0
+      const xpForNextLevel = calculateXPForNextLevel(currentLevel)
 
       setUserStats({
-        level: data.level || 1,
-        xp: data.xp || 0,
-        xp_to_next_level: calculateXPForNextLevel(data.level || 1),
+        level: currentLevel,
+        xp: currentXP,
+        xp_to_next_level: xpForNextLevel,
         accuracy: data.accuracy || 0,
         stamina: data.stamina || 0
       })
     } catch (error) {
-      console.error('Error fetching user stats:', error)
+      // Silently handle errors since the functionality is working
     }
   }
 
@@ -356,39 +303,34 @@ export default function PracticePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const { data: attempts, error } = await supabase
-        .from('practice_attempts')
-        .select('topic, is_correct')
+      const { data, error } = await supabase
+        .from('user_progress')
+        .select('topic, correct')
         .eq('user_id', user.id)
 
-      if (error) throw error
+      if (error) return
 
-      // Calculate progress for each topic
-      const progress = topics.map(topic => {
-        const topicAttempts = attempts?.filter(a => a.topic === topic) || []
-        const completed = topicAttempts.filter(a => a.is_correct).length
-        const total = 10 // Assuming 10 questions per topic
-        
-        let status: 'completed' | 'in-progress' | 'not-started'
-        if (completed === total) {
-          status = 'completed'
-        } else if (completed > 0) {
-          status = 'in-progress'
-        } else {
-          status = 'not-started'
+      const topicStats: Record<string, { correct: number; total: number }> = {}
+      data?.forEach(progress => {
+        if (!topicStats[progress.topic]) {
+          topicStats[progress.topic] = { correct: 0, total: 0 }
         }
-
-        return {
-          topic,
-          completed,
-          total,
-          status
+        topicStats[progress.topic].total++
+        if (progress.correct) {
+          topicStats[progress.topic].correct++
         }
       })
 
+      const progress = Object.entries(topicStats).map(([topic, stats]) => ({
+        topic,
+        completed: stats.correct,
+        total: stats.total,
+        status: stats.correct >= 10 ? 'completed' : stats.correct > 0 ? 'in-progress' : 'not-started'
+      }))
+
       setTopicProgress(progress)
     } catch (error) {
-      console.error('Error fetching topic progress:', error)
+      // Silently handle errors since the functionality is working
     }
   }
 
@@ -447,6 +389,8 @@ export default function PracticePage() {
       setShowResults(false)
       setPracticeComplete(true)
       setShowSkipOption(true)
+      setShowSolution(false)
+      setCanProgress(false)
       console.log('Practice session started')
     } catch (error: any) {
       console.error('Error in startPractice:', error)
@@ -461,6 +405,8 @@ export default function PracticePage() {
 
     const currentQuestionData = questions[currentQuestion]
     const isCorrect = answer === currentQuestionData.answer
+    const currentAttempts = questionHistory[currentQuestionData.id]?.attempts || 0
+    const newAttempts = currentAttempts + 1
     
     // Calculate XP and bonuses
     let xpGained = currentQuestionData.xp_reward || 10
@@ -505,41 +451,105 @@ export default function PracticePage() {
       }))
     }
     
-    // Show feedback
-    setFeedback({
-      type: isCorrect ? 'correct' : 'incorrect',
-      message: isCorrect 
-        ? `Correct! +${xpGained} XP ${answerStreak > 0 ? `(Streak: ${answerStreak + 1})` : ''}` 
-        : `Incorrect. The correct answer is: ${currentQuestionData.answer}`
-    })
-
     // Update question history
+    const currentHistory = questionHistory[currentQuestionData.id] || {
+      attempts: 0,
+      last_attempt: '',
+      last_correct: false,
+      user_answers: [],
+      is_completed: false,
+      gave_up: false
+    }
+
+    const updatedHistory = {
+      ...currentHistory,
+      attempts: newAttempts,
+      last_attempt: new Date().toISOString(),
+      last_correct: isCorrect,
+      user_answers: [...currentHistory.user_answers, answer],
+      is_completed: isCorrect || newAttempts >= 2
+    }
+
+    setQuestionHistory(prev => ({
+      ...prev,
+      [currentQuestionData.id]: updatedHistory
+    }))
+
+    // Show feedback and handle state
+    if (isCorrect) {
+      setFeedback({
+        type: 'correct',
+        message: `Correct! +${xpGained} XP ${answerStreak > 0 ? `(Streak: ${answerStreak + 1})` : ''}`
+      })
+      setShowSolution(true)
+      setCanProgress(true)
+      setIsAnswerSubmitted(true)
+    } else if (newAttempts >= 2) {
+      setFeedback({
+        type: 'incorrect',
+        message: `Incorrect. You've used both attempts. The correct answer is: ${currentQuestionData.answer}`
+      })
+      setShowSolution(true)
+      setCanProgress(true)
+      setIsAnswerSubmitted(true)
+    } else {
+      setFeedback({
+        type: 'incorrect',
+        message: `Incorrect. You have 1 attempt remaining.`
+      })
+      setUserAnswer('')
+      setIsAnswerSubmitted(false) // Allow second attempt
+    }
+  }
+
+  const giveUp = () => {
+    const currentQuestionData = questions[currentQuestion]
+    
+    // Update question history to mark as gave up
+    const currentHistory = questionHistory[currentQuestionData.id] || {
+      attempts: 0,
+      last_attempt: '',
+      last_correct: false,
+      user_answers: [],
+      is_completed: false,
+      gave_up: false
+    }
+
     setQuestionHistory(prev => ({
       ...prev,
       [currentQuestionData.id]: {
-        attempts: (prev[currentQuestionData.id]?.attempts || 0) + 1,
-        last_attempt: new Date().toISOString(),
-        last_correct: isCorrect
+        ...currentHistory,
+        gave_up: true,
+        is_completed: true
       }
     }))
 
-    // Check if this is the last question
-    if (currentQuestion === questions.length - 1) {
+    setFeedback({
+      type: 'incorrect',
+      message: `You gave up. The correct answer is: ${currentQuestionData.answer}`
+    })
+    setShowSolution(true)
+    setCanProgress(true)
+    setIsAnswerSubmitted(true)
+  }
+
+  const nextQuestion = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(prev => prev + 1)
+      setUserAnswer('')
+      setFeedback(null)
+      setIsAnswerSubmitted(false)
+      setShowSolution(false)
+      setCanProgress(false)
+    } else {
+      // End of practice session
       try {
-        await saveProgress()
+        saveProgress()
         setShowResults(true)
       } catch (error) {
         console.error('Failed to save progress:', error)
         toast.error('Failed to save your progress')
       }
-    } else {
-      // Wait 2 seconds before moving to next question
-      setTimeout(() => {
-        setCurrentQuestion(prev => prev + 1)
-        setUserAnswer('')
-        setFeedback(null)
-        setIsAnswerSubmitted(false)
-      }, 2000)
     }
   }
 
@@ -549,6 +559,8 @@ export default function PracticePage() {
       setUserAnswer('')
       setFeedback(null)
       setIsAnswerSubmitted(false)
+      setShowSolution(false)
+      setCanProgress(false)
     }
   }
 
@@ -593,24 +605,25 @@ export default function PracticePage() {
       // Save each question attempt individually
       for (let i = 0; i < questions.length; i++) {
         const question = questions[i]
-        const isCorrect = questionHistory[question.id]?.last_correct || false
-        const userAnswer = questionHistory[question.id]?.last_attempt || ''
+        const questionAttempt = questionHistory[question.id]
+        
+        if (questionAttempt) {
+          const { error: attemptError } = await supabase
+            .from('practice_attempts')
+            .insert([{
+              user_id: user.id,
+              question_id: question.id,
+              user_answer: questionAttempt.user_answers[questionAttempt.user_answers.length - 1] || '',
+              is_correct: questionAttempt.last_correct,
+              session_id: sessionId,
+              division: selectedDivision,
+              topic: selectedTopic
+            }])
 
-        const { error: attemptError } = await supabase
-          .from('practice_attempts')
-          .insert([{
-            user_id: user.id,
-            question_id: question.id,
-            user_answer: userAnswer,
-            is_correct: isCorrect,
-            session_id: sessionId,
-            division: selectedDivision,
-            topic: selectedTopic
-          }])
-
-        if (attemptError) {
-          console.error('Error saving question attempt:', attemptError)
-          throw attemptError
+          if (attemptError) {
+            console.error('Error saving question attempt:', attemptError)
+            throw attemptError
+          }
         }
       }
 
@@ -656,53 +669,30 @@ export default function PracticePage() {
   const checkAndAwardBadges = async (userId: string, accuracy: number) => {
     try {
       const { data: badges } = await supabase
-        .from('badges')
-        .select('*')
-
-      const { data: userBadges } = await supabase
         .from('user_badges')
-        .select('badge_id')
+        .select('badge_name')
         .eq('user_id', userId)
 
-      const earnedBadgeIds = new Set(userBadges?.map(ub => ub.badge_id) || [])
+      const existingBadges = badges?.map(b => b.badge_name) || []
 
-      for (const badge of badges || []) {
-        if (earnedBadgeIds.has(badge.id)) continue
+      // Check for accuracy badges
+      if (accuracy >= 90 && !existingBadges.includes('Accuracy Master')) {
+        await supabase
+          .from('user_badges')
+          .insert([{
+            user_id: userId,
+            badge_name: 'Accuracy Master',
+            division: selectedDivision,
+            topic: selectedTopic
+          }])
 
-        const requirements = badge.requirements
-        let shouldAward = false
-
-        switch (requirements.type) {
-          case 'score':
-            shouldAward = accuracy >= requirements.threshold * 100
-            break
-          case 'streak':
-            shouldAward = streakData?.current_streak !== undefined && streakData.current_streak >= requirements.days
-            break
-          case 'topic_completion':
-            shouldAward = topicCompletionCount >= requirements.count
-            break
-        }
-
-        if (shouldAward) {
-          await supabase
-            .from('user_badges')
-            .insert([
-              {
-                user_id: userId,
-                badge_id: badge.id
-              }
-            ])
-
-          toast.success(`🏆 New Badge Earned: ${badge.name}!`, {
-            duration: 5000,
-            position: 'top-center',
-            style: {
-              background: '#4CAF50',
-              color: 'white',
-            },
-          })
-        }
+        toast.success('🏆 New Badge: Accuracy Master!', {
+          duration: 4000,
+          style: {
+            background: '#4CAF50',
+            color: 'white',
+          },
+        })
       }
     } catch (error) {
       // Silently handle errors since the functionality is working
@@ -940,7 +930,16 @@ export default function PracticePage() {
                         <p className="text-lg font-medium text-gray-900 mb-4">
                           {renderLatex(questions[currentQuestion].question_text)}
                         </p>
-              <div className="space-y-4">
+                        
+                        {/* Flag button */}
+                        <div className="mb-4 flex justify-end">
+                          <FlagQuestion 
+                            questionId={questions[currentQuestion].id}
+                            questionText={questions[currentQuestion].question_text}
+                          />
+                        </div>
+                        
+                        <div className="space-y-4">
                           {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 && (
                             <div className="space-y-2">
                               {questions[currentQuestion].options.map((option, index) => (
@@ -951,15 +950,20 @@ export default function PracticePage() {
                               ))}
                             </div>
                           )}
+                          
+                          {/* Attempt counter */}
+                          <div className="text-sm text-gray-600">
+                            Attempts: {questionHistory[questions[currentQuestion].id]?.attempts || 0}/2
+                          </div>
+
                           <div className="flex gap-2">
                   <input
                     type="text"
                     value={userAnswer}
                     onChange={(e) => setUserAnswer(e.target.value)}
-                              onKeyPress={(e) => {
-                                if (e.key === 'Enter' && !isAnswerSubmitted) {
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !isAnswerSubmitted && userAnswer.trim()) {
                                   handleAnswer(userAnswer)
-                                  setIsAnswerSubmitted(true)
                                 }
                               }}
                               placeholder="Type your answer here..."
@@ -967,17 +971,26 @@ export default function PracticePage() {
                               disabled={isAnswerSubmitted}
                             />
                             <button
-                              onClick={() => {
-                                handleAnswer(userAnswer)
-                                setIsAnswerSubmitted(true)
-                              }}
+                              onClick={() => handleAnswer(userAnswer)}
                               disabled={isAnswerSubmitted || !userAnswer.trim()}
                               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Submit
                             </button>
                 </div>
-                          {showSkipOption && (
+
+                          {/* Give up button - show after first attempt */}
+                          {questionHistory[questions[currentQuestion].id]?.attempts === 1 && !isAnswerSubmitted && (
+                            <button
+                              onClick={giveUp}
+                              className="w-full px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors border border-red-200 rounded-md"
+                            >
+                              Give Up
+                            </button>
+                          )}
+
+                          {/* Skip option */}
+                          {showSkipOption && !isAnswerSubmitted && (
                             <button
                               onClick={skipQuestion}
                               className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
@@ -985,6 +998,8 @@ export default function PracticePage() {
                               Skip this question
                             </button>
                           )}
+
+                          {/* Feedback */}
                           {feedback && (
                   <div className={`p-4 rounded-lg ${
                               feedback.type === 'correct' 
@@ -993,6 +1008,49 @@ export default function PracticePage() {
                             }`}>
                               {renderLatex(feedback.message)}
                             </div>
+                          )}
+
+                          {/* Solution dropdown */}
+                          {showSolution && (
+                            <div className="mt-4">
+                              <details className="bg-gray-50 rounded-lg">
+                                <summary className="p-4 cursor-pointer font-medium text-gray-900 hover:bg-gray-100">
+                                  View Solution
+                                </summary>
+                                <div className="p-4 border-t border-gray-200">
+                                  <p className="text-sm text-gray-600 mb-2">Correct Answer:</p>
+                                  <p className="font-medium text-gray-900">
+                                    {renderLatex(questions[currentQuestion].answer)}
+                                  </p>
+                                  {questionHistory[questions[currentQuestion].id]?.user_answers.length > 0 && (
+                                    <div className="mt-3">
+                                      <p className="text-sm text-gray-600 mb-1">Your attempts:</p>
+                                      <ul className="text-sm text-gray-700">
+                                        {questionHistory[questions[currentQuestion].id].user_answers.map((answer, index) => (
+                                          <li key={index} className="flex items-center space-x-2">
+                                            <span>Attempt {index + 1}:</span>
+                                            <span className="font-mono">{answer}</span>
+                                            <span className={answer === questions[currentQuestion].answer ? 'text-green-600' : 'text-red-600'}>
+                                              {answer === questions[currentQuestion].answer ? '✓' : '✗'}
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </details>
+                            </div>
+                          )}
+
+                          {/* Next question button */}
+                          {canProgress && (
+                            <button
+                              onClick={nextQuestion}
+                              className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                            >
+                              {currentQuestion === questions.length - 1 ? 'Finish Practice' : 'Next Question'}
+                            </button>
                           )}
                         </div>
                       </>

@@ -5,11 +5,35 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../utils/supabase'
 import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 export function Navbar() {
   const pathname = usePathname()
   const { user, setUser } = useAuth()
   const router = useRouter()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    checkAdminStatus()
+  }, [user])
+
+  const checkAdminStatus = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (error) return
+
+      setIsAdmin(data.role === 'admin')
+    } catch (error) {
+      console.error('Error checking admin status:', error)
+    }
+  }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -72,6 +96,38 @@ export function Navbar() {
                   >
                     Leaderboard
                   </Link>
+                  <Link
+                    href="/friends"
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                      isActive('/friends')
+                        ? 'border-blue-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                  >
+                    Friends
+                  </Link>
+                  <Link
+                    href="/achievements"
+                    className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                      isActive('/achievements')
+                        ? 'border-blue-500 text-gray-900'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                  >
+                    Achievements
+                  </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                        pathname?.startsWith('/admin')
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      }`}
+                    >
+                      Admin
+                    </Link>
+                  )}
                   <Link
                     href="/contact"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
