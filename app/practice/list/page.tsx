@@ -13,10 +13,6 @@ interface Question {
   options: string[]
   answer: string
   difficulty: number
-  level: number
-  xp_reward: number
-  accuracy_bonus: number
-  stamina_bonus: number
   topic: string
   division: string
   attempts?: number
@@ -118,9 +114,15 @@ export default function ListPracticePage() {
   // Load questions when division, topics, or search changes
   useEffect(() => {
     if (selectedDivision && selectedTopics.length > 0) {
-      fetchQuestions()
+      // First fetch question history, then fetch questions
+      const loadData = async () => {
+        await fetchQuestionHistory()
+        await fetchQuestions()
+      }
+      loadData()
     } else {
       setQuestions([])
+      setQuestionHistory({})
     }
   }, [selectedDivision, selectedTopics])
 
@@ -197,6 +199,71 @@ export default function ListPracticePage() {
     }
   }
 
+  const fetchQuestionHistory = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        console.log('No session found, returning empty history')
+        return {}
+      }
+
+      console.log('Fetching question history for division:', selectedDivision, 'topics:', selectedTopics)
+
+      // Query practice_attempts to get all attempts for this user, division, and topics
+      let query = supabase
+        .from('practice_attempts')
+        .select('question_id, is_correct')
+        .eq('user_id', session.user.id)
+        .eq('division', selectedDivision)
+
+      if (selectedTopics.length > 0) {
+        query = query.in('topic', selectedTopics)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching question history:', error)
+        return {}
+      }
+
+      console.log('Raw practice attempts data:', data)
+
+      // Process the data to determine status for each question
+      const history: Record<string, QuestionAttempt> = {}
+      
+      data?.forEach(attempt => {
+        const questionId = attempt.question_id
+        
+        if (!history[questionId]) {
+          history[questionId] = {
+            attempts: 0,
+            last_attempt: '',
+            last_correct: false,
+            user_answers: [],
+            is_completed: false,
+            gave_up: false
+          }
+        }
+        
+        history[questionId].attempts++
+        history[questionId].last_correct = attempt.is_correct
+        
+        // If any attempt was correct, mark as completed
+        if (attempt.is_correct) {
+          history[questionId].is_completed = true
+        }
+      })
+
+      console.log('Processed question history:', history)
+      setQuestionHistory(history)
+      return history
+    } catch (error) {
+      console.error('Error in fetchQuestionHistory:', error)
+      return {}
+    }
+  }
+
   const fetchQuestions = async () => {
     try {
       setLoading(true)
@@ -204,7 +271,7 @@ export default function ListPracticePage() {
 
       let query = supabase
         .from('questions')
-        .select('id, question_text, options, answer, division, topic, difficulty, level, xp_reward, accuracy_bonus, stamina_bonus')
+        .select('id, question_text, options, answer, division, topic, difficulty')
         .eq('division', selectedDivision)
 
       if (selectedTopics.length > 0) {
@@ -218,13 +285,12 @@ export default function ListPracticePage() {
         throw questionsError
       }
 
-      await fetchQuestionHistory()
-
       if (!questionsData || questionsData.length === 0) {
         setError('No questions available for the selected topics')
         return
       }
 
+      // Use the history data directly
       const questionsWithHistory = questionsData.map(q => ({
         ...q,
         completed: questionHistory[q.id]?.last_correct || false,
@@ -237,53 +303,6 @@ export default function ListPracticePage() {
       setError(error.message || 'Failed to fetch questions')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const fetchQuestionHistory = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) return
-
-      let query = supabase
-        .from('practice_attempts')
-        .select('question_id, user_answer, is_correct, created_at')
-        .eq('user_id', session.user.id)
-        .eq('division', selectedDivision)
-
-      if (selectedTopics.length > 0) {
-        query = query.in('topic', selectedTopics)
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching question history:', error)
-        return
-      }
-
-      const history: Record<string, QuestionAttempt> = {}
-      data?.forEach(attempt => {
-        if (!history[attempt.question_id]) {
-          history[attempt.question_id] = {
-            attempts: 0,
-            last_attempt: '',
-            last_correct: false,
-            user_answers: [],
-            is_completed: false,
-            gave_up: false
-          }
-        }
-        history[attempt.question_id].attempts++
-        history[attempt.question_id].last_attempt = attempt.created_at
-        history[attempt.question_id].last_correct = attempt.is_correct
-        history[attempt.question_id].user_answers.push(attempt.user_answer)
-        history[attempt.question_id].is_completed = attempt.is_correct
-      })
-
-      setQuestionHistory(history)
-    } catch (error) {
-      console.error('Error in fetchQuestionHistory:', error)
     }
   }
 

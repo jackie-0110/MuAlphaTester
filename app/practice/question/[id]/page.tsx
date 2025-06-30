@@ -16,10 +16,6 @@ interface Question {
   options: string[]
   answer: string
   difficulty: number
-  level: number
-  xp_reward: number
-  accuracy_bonus: number
-  stamina_bonus: number
   topic: string
   division: string
 }
@@ -120,7 +116,7 @@ export default function QuestionPage() {
     if (isCorrect) {
       setFeedback({
         type: 'correct',
-        message: `Correct! +${question.xp_reward} XP`
+        message: 'Correct!'
       })
       setShowSolution(true)
     } else {
@@ -223,7 +219,7 @@ export default function QuestionPage() {
               {question.options.map((option, index) => (
                 <button
                   key={index}
-                  onClick={() => setUserAnswer(index)}
+                  onClick={() => setUserAnswer(userAnswer === index ? null : index)}
                   className={`w-full p-4 text-left border rounded-lg transition-all duration-200 ${
                     userAnswer === index
                       ? 'border-blue-500 bg-blue-50'

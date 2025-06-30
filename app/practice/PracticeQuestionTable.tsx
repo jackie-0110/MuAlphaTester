@@ -31,6 +31,10 @@ export default function PracticeQuestionTable({
   const [page, setPage] = useState(1)
   const pageSize = 10
 
+  // Debug logging
+  console.log('PracticeQuestionTable received questionHistory:', questionHistory)
+  console.log('PracticeQuestionTable received questions:', questions.length)
+
   // Filter and search
   const filtered = useMemo(() => {
     let q = questions
@@ -123,19 +127,41 @@ export default function PracticeQuestionTable({
               </span>
             </div>
             <div>
-              {questionHistory[q.id]?.last_correct ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Solved
-                </span>
-              ) : questionHistory[q.id]?.attempts > 0 ? (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                  Attempted
-                </span>
-              ) : (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  New
-                </span>
-              )}
+              {(() => {
+                const history = questionHistory[q.id]
+                
+                console.log(`Question ${q.id} status:`, {
+                  history,
+                  hasAttempts: !!history,
+                  isCompleted: history?.is_completed,
+                  lastCorrect: history?.last_correct
+                })
+                
+                // If no history exists, question is unattempted
+                if (!history) {
+                  return (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      Unattempted
+                    </span>
+                  )
+                }
+                
+                // If history exists and any attempt was correct, question is solved
+                if (history.is_completed) {
+                  return (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Solved
+                    </span>
+                  )
+                }
+                
+                // If history exists but no correct attempts, question was attempted but wrong
+                return (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    Attempted
+                  </span>
+                )
+              })()}
             </div>
             <div onClick={e => { e.stopPropagation(); onFlag(q); }}>
               <FlagQuestion questionId={q.id} questionText={q.question_text} />
