@@ -74,7 +74,7 @@ export default function AdaptivePracticePage() {
   const [score, setScore] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userAnswer, setUserAnswer] = useState<string>('')
+  const [userAnswer, setUserAnswer] = useState<number | null>(null)
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'incorrect', message: string } | null>(null)
   const [answerStreak, setAnswerStreak] = useState(0)
@@ -360,11 +360,13 @@ export default function AdaptivePracticePage() {
     return Math.floor(100 * Math.pow(1.5, currentLevel - 1))
   }
 
-  const handleAnswer = async (answer: string) => {
+  const handleAnswer = async () => {
     if (!startTime) return
 
     const currentQuestionData = questions[currentQuestion]
-    const isCorrect = answer === currentQuestionData.answer
+    // Ensure answer is a number (index)
+    const correctIndex = typeof currentQuestionData.answer === 'number' ? currentQuestionData.answer : parseInt(currentQuestionData.answer, 10)
+    const isCorrect = userAnswer === correctIndex
     const currentAttempts = questionHistory[currentQuestionData.id]?.attempts || 0
     const newAttempts = currentAttempts + 1
     
@@ -426,7 +428,7 @@ export default function AdaptivePracticePage() {
       attempts: newAttempts,
       last_attempt: new Date().toISOString(),
       last_correct: isCorrect,
-      user_answers: [...currentHistory.user_answers, answer],
+      user_answers: [...currentHistory.user_answers, String(userAnswer)],
       is_completed: isCorrect || newAttempts >= 2
     }
 
@@ -447,7 +449,7 @@ export default function AdaptivePracticePage() {
     } else if (newAttempts >= 2) {
       setFeedback({
         type: 'incorrect',
-        message: `Incorrect. You've used both attempts. The correct answer is: ${currentQuestionData.answer}`
+        message: `Incorrect. You've used both attempts. The correct answer is: ${currentQuestionData.options[correctIndex]}`
       })
       setShowSolution(true)
       setCanProgress(true)
@@ -457,7 +459,7 @@ export default function AdaptivePracticePage() {
         type: 'incorrect',
         message: `Incorrect. You have 1 attempt remaining.`
       })
-      setUserAnswer('')
+      setUserAnswer(null)
       setIsAnswerSubmitted(false) // Allow second attempt
     }
   }
@@ -465,7 +467,7 @@ export default function AdaptivePracticePage() {
   const nextQuestion = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1)
-      setUserAnswer('')
+      setUserAnswer(null)
       setFeedback(null)
       setShowSolution(false)
       setCanProgress(false)
@@ -480,7 +482,7 @@ export default function AdaptivePracticePage() {
   const skipQuestion = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1)
-      setUserAnswer('')
+      setUserAnswer(null)
       setFeedback(null)
       setIsAnswerSubmitted(false)
       setShowSolution(false)
@@ -548,170 +550,201 @@ export default function AdaptivePracticePage() {
 
   return (
     <ProtectedRoute>
-      <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-gray-50">
         <Toaster />
         
-        {/* Back Button */}
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/practice')}
-            className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Practice Hub
-          </button>
-        </div>
-
-        {/* Session Info */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Adaptive Practice Session</h3>
-            <div className="flex items-center space-x-4 text-sm">
-              <span className="text-gray-500">Question {currentQuestion + 1} of {questions.length}</span>
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                {(() => {
-                  const { min, max, target } = optimalDifficultyRange
-                  return `Difficulty: ${min}-${max}`
-                })()}
-              </span>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{questions.length}</p>
-              <p className="text-gray-500">Total Questions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {questions.filter(q => !questionHistory[q.id]).length}
-              </p>
-              <p className="text-gray-500">New Questions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-blue-600">
-                {questions.filter(q => questionHistory[q.id]).length}
-              </p>
-              <p className="text-gray-500">Review Questions</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-purple-600">{score}</p>
-              <p className="text-gray-500">Correct Answers</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Question Display */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                currentQuestionData.difficulty <= 3 ? 'bg-green-100 text-green-800' :
-                currentQuestionData.difficulty <= 6 ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {currentQuestionData.difficulty <= 3 ? 'Easy' :
-                 currentQuestionData.difficulty <= 6 ? 'Medium' : 'Hard'}
-              </span>
-              {questionHistory[currentQuestionData.id] && (
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                  Review
-                </span>
-              )}
-            </div>
-            <FlagQuestion 
-              questionId={currentQuestionData.id}
-              questionText={currentQuestionData.question_text}
-            />
-          </div>
-
-          {/* Question Content */}
-          <div className="mb-6">
-            <div className="prose max-w-none">
-              {renderLatex(currentQuestionData.question_text)}
-            </div>
-          </div>
-
-          {/* Answer Options */}
-          {!isAnswerSubmitted && (
-            <div className="space-y-3 mb-6">
-              {currentQuestionData.options.map((option, index) => (
+        {/* Header */}
+        <div className="bg-white shadow-sm border-b border-gray-200">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
                 <button
-                  key={index}
-                  onClick={() => setUserAnswer(option)}
-                  className={`w-full p-4 text-left border rounded-lg transition-all duration-200 ${
-                    userAnswer === option
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
+                  onClick={() => router.push('/practice')}
+                  className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
                 >
-                  <span className="font-medium text-gray-700">
-                    {String.fromCharCode(65 + index)}. 
-                  </span>
-                  <span className="ml-2">{renderLatex(option)}</span>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back to Practice Hub
                 </button>
-              ))}
-            </div>
-          )}
-
-          {/* Feedback */}
-          {feedback && (
-            <div className={`p-4 rounded-lg mb-6 ${
-              feedback.type === 'correct' 
-                ? 'bg-green-50 border border-green-200' 
-                : 'bg-red-50 border border-red-200'
-            }`}>
-              <div className="flex items-center">
-                {feedback.type === 'correct' ? (
-                  <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                )}
-                <span className={`font-medium ${
-                  feedback.type === 'correct' ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {feedback.message}
+                <h1 className="text-2xl font-bold text-gray-900">Adaptive Practice</h1>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-500">
+                  Question {currentQuestion + 1} of {questions.length}
                 </span>
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {!isAnswerSubmitted && userAnswer && (
-                <button
-                  onClick={() => handleAnswer(userAnswer)}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Submit Answer
-                </button>
-              )}
-              {showSkipOption && !isAnswerSubmitted && (
-                <button
-                  onClick={skipQuestion}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-                >
-                  Skip
-                </button>
-              )}
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex gap-6">
+            {/* Sidebar */}
+            <div className="w-80 flex-shrink-0">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 sticky top-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Info</h2>
+                
+                {/* Session Stats */}
+                <div className="space-y-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">{score}</p>
+                    <p className="text-sm text-gray-600">Correct Answers</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="text-center p-3 bg-gray-50 rounded-lg">
+                      <p className="text-lg font-bold text-gray-900">{questions.length}</p>
+                      <p className="text-gray-500">Total</p>
+                    </div>
+                    <div className="text-center p-3 bg-green-50 rounded-lg">
+                      <p className="text-lg font-bold text-green-600">
+                        {questions.filter(q => !questionHistory[q.id]).length}
+                      </p>
+                      <p className="text-gray-500">New</p>
+                    </div>
+                    <div className="text-center p-3 bg-blue-50 rounded-lg">
+                      <p className="text-lg font-bold text-blue-600">
+                        {questions.filter(q => questionHistory[q.id]).length}
+                      </p>
+                      <p className="text-gray-500">Review</p>
+                    </div>
+                    <div className="text-center p-3 bg-purple-50 rounded-lg">
+                      <p className="text-lg font-bold text-purple-600">
+                        {Math.round((score / questions.length) * 100)}%
+                      </p>
+                      <p className="text-gray-500">Accuracy</p>
+                    </div>
+                  </div>
+                  
+                  {/* Difficulty Range */}
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-1">Difficulty Range</p>
+                    <p className="text-lg font-bold text-green-600">
+                      {(() => {
+                        const { min, max } = optimalDifficultyRange
+                        return `${min}-${max}`
+                      })()}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex items-center space-x-3">
-              {canProgress && (
-                <button
-                  onClick={nextQuestion}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  {currentQuestion < questions.length - 1 ? 'Next Question' : 'Finish Session'}
-                </button>
-              )}
+
+            {/* Main Content */}
+            <div className="flex-1">
+              {/* Question Display */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      currentQuestionData.difficulty <= 3 ? 'bg-green-100 text-green-800' :
+                      currentQuestionData.difficulty <= 6 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {currentQuestionData.difficulty <= 3 ? 'Easy' :
+                       currentQuestionData.difficulty <= 6 ? 'Medium' : 'Hard'}
+                    </span>
+                    {questionHistory[currentQuestionData.id] && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        Review
+                      </span>
+                    )}
+                  </div>
+                  <FlagQuestion 
+                    questionId={currentQuestionData.id}
+                    questionText={currentQuestionData.question_text}
+                  />
+                </div>
+
+                {/* Question Content */}
+                <div className="mb-6">
+                  <div className="prose max-w-none">
+                    {renderLatex(currentQuestionData.question_text)}
+                  </div>
+                </div>
+
+                {/* Answer Options */}
+                {!isAnswerSubmitted && (
+                  <div className="space-y-3 mb-6">
+                    {currentQuestionData.options.map((option, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setUserAnswer(index)}
+                        className={`w-full p-4 text-left border rounded-lg transition-all duration-200 ${
+                          userAnswer === index
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="font-medium text-gray-700">
+                          {String.fromCharCode(65 + index)}.
+                        </span>
+                        <span className="ml-2">{renderLatex(option)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Feedback */}
+                {feedback && (
+                  <div className={`p-4 rounded-lg mb-6 ${
+                    feedback.type === 'correct' 
+                      ? 'bg-green-50 border border-green-200' 
+                      : 'bg-red-50 border border-red-200'
+                  }`}>
+                    <div className="flex items-center">
+                      {feedback.type === 'correct' ? (
+                        <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                      <span className={`font-medium ${
+                        feedback.type === 'correct' ? 'text-green-800' : 'text-red-800'
+                      }`}>
+                        {feedback.message}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {!isAnswerSubmitted && userAnswer !== null && (
+                      <button
+                        onClick={handleAnswer}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                      >
+                        Submit Answer
+                      </button>
+                    )}
+                    {showSkipOption && !isAnswerSubmitted && (
+                      <button
+                        onClick={skipQuestion}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                      >
+                        Skip
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    {canProgress && (
+                      <button
+                        onClick={nextQuestion}
+                        className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                      >
+                        {currentQuestion < questions.length - 1 ? 'Next Question' : 'Finish Session'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import FlagQuestion from '../components/FlagQuestion'
+import { logQuestionAttempt } from '@/app/utils/logQuestionAttempt'
+import { supabase } from '@/utils/supabase'
 
 interface PracticeQuestionTableProps {
   questions: any[]
@@ -52,66 +54,139 @@ export default function PracticeQuestionTable({
     router.push(`/practice/question/${question.id}`)
   }
 
+  const handleAnswer = async (question: any, answer: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await logQuestionAttempt({
+          userId: session.user.id,
+          questionId: question.id,
+          division: question.division,
+          topic: question.topic,
+          attempts: 1, // For now, always 1 per submission
+          gaveUp: false,
+          userAnswers: [answer],
+        });
+      }
+    } catch (err) {
+      console.error('Failed to log question attempt:', err);
+    }
+    // Call the original onAnswer prop if needed
+    onAnswer(question, answer);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200">
-      {/* Search and filter bar */}
-      <div className="flex flex-wrap items-center gap-2 p-4 border-b border-gray-100">
-        <input
-          type="text"
-          placeholder="Search questions..."
-          value={searchValue}
-          onChange={e => setSearchValue(e.target.value)}
-          className="p-2 border rounded w-64"
-        />
-        <select
-          multiple
-          value={selectedTopics}
-          onChange={e => setSelectedTopics(Array.from(e.target.selectedOptions, o => o.value))}
-          className="p-2 border rounded min-w-[120px]"
-        >
-          {topics.map(topic => (
-            <option key={topic} value={topic}>{topic}</option>
-          ))}
-        </select>
-      </div>
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       {/* Table header */}
-      <div className="grid grid-cols-5 gap-2 px-4 py-2 text-xs font-semibold text-gray-600 border-b border-gray-100">
-        <div>Title</div>
-        <div>Topic</div>
-        <div>Difficulty</div>
-        <div>Status</div>
-        <div>Flag</div>
-      </div>
-      {/* Table rows */}
-      {paginated.map((q, i) => (
-        <div
-          key={q.id}
-          className="grid grid-cols-5 gap-2 px-4 py-3 items-center border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
-          onClick={() => handleQuestionClick(q)}
-        >
-          <div className="truncate max-w-xs" title={q.question_text}>{q.question_text}</div>
-          <div className="text-sm text-gray-600">{q.topic}</div>
-          <div>{q.difficulty <= 3 ? 'Easy' : q.difficulty <= 6 ? 'Medium' : 'Hard'}</div>
-          <div>{questionHistory[q.id]?.last_correct ? 'Solved' : 'Unsolved'}</div>
-          <div onClick={e => { e.stopPropagation(); onFlag(q); }}>
-            <FlagQuestion questionId={q.id} questionText={q.question_text} />
+      <div className="px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">
+            Questions ({filtered.length} total)
+          </h3>
+          <div className="text-sm text-gray-500">
+            Page {page} of {totalPages}
           </div>
         </div>
-      ))}
-      {/* Pagination */}
-      <div className="flex justify-between items-center p-4">
-        <button
-          onClick={() => setPage(p => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >Prev</button>
-        <span>Page {page} of {totalPages}</span>
-        <button
-          onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="px-3 py-1 border rounded disabled:opacity-50"
-        >Next</button>
       </div>
+      
+      {/* Table */}
+      <div className="overflow-hidden">
+        {/* Table header */}
+        <div className="grid grid-cols-5 gap-4 px-6 py-3 text-sm font-semibold text-gray-600 border-b border-gray-100 bg-gray-50">
+          <div>Question</div>
+          <div>Topic</div>
+          <div>Difficulty</div>
+          <div>Status</div>
+          <div>Actions</div>
+        </div>
+        
+        {/* Table rows */}
+        {paginated.map((q, i) => (
+          <div
+            key={q.id}
+            className="grid grid-cols-5 gap-4 px-6 py-4 items-center border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+            onClick={() => handleQuestionClick(q)}
+          >
+            <div className="truncate max-w-xs" title={q.question_text}>
+              <div className="font-medium text-gray-900">{q.question_text}</div>
+            </div>
+            <div className="text-sm text-gray-600">{q.topic}</div>
+            <div>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                q.difficulty <= 3 
+                  ? 'bg-green-100 text-green-800' 
+                  : q.difficulty <= 6 
+                    ? 'bg-yellow-100 text-yellow-800' 
+                    : 'bg-red-100 text-red-800'
+              }`}>
+                {q.difficulty <= 3 ? 'Easy' : q.difficulty <= 6 ? 'Medium' : 'Hard'}
+              </span>
+            </div>
+            <div>
+              {questionHistory[q.id]?.last_correct ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Solved
+                </span>
+              ) : questionHistory[q.id]?.attempts > 0 ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Attempted
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  New
+                </span>
+              )}
+            </div>
+            <div onClick={e => { e.stopPropagation(); onFlag(q); }}>
+              <FlagQuestion questionId={q.id} questionText={q.question_text} />
+            </div>
+          </div>
+        ))}
+        
+        {paginated.length === 0 && (
+          <div className="px-6 py-8 text-center text-gray-500">
+            No questions match your current filters.
+          </div>
+        )}
+      </div>
+      
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-between items-center px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+          <div className="flex items-center space-x-2">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = Math.max(1, Math.min(totalPages - 4, page - 2)) + i
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setPage(pageNum)}
+                  className={`px-3 py-1 text-sm rounded-md transition-colors ${
+                    page === pageNum
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   )
 } 

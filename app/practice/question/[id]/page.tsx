@@ -8,6 +8,7 @@ import { toast, Toaster } from 'react-hot-toast'
 import FlagQuestion from '../../../components/FlagQuestion'
 import 'katex/dist/katex.min.css'
 import renderMathInElement from 'katex/dist/contrib/auto-render'
+import { logQuestionAttempt } from '@/app/utils/logQuestionAttempt'
 
 interface Question {
   id: string
@@ -57,7 +58,7 @@ export default function QuestionPage() {
   
   const [question, setQuestion] = useState<Question | null>(null)
   const [loading, setLoading] = useState(true)
-  const [userAnswer, setUserAnswer] = useState<string>('')
+  const [userAnswer, setUserAnswer] = useState<number | null>(null)
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'correct' | 'incorrect', message: string } | null>(null)
   const [showSolution, setShowSolution] = useState(false)
@@ -90,10 +91,31 @@ export default function QuestionPage() {
     }
   }
 
-  const handleAnswer = async (answer: string) => {
-    if (!question) return
+  const handleAnswer = async () => {
+    if (!question || userAnswer === null) return
 
-    const isCorrect = answer === question.answer
+    // Ensure question.answer is a number (index)
+    const correctIndex = typeof question.answer === 'number' ? question.answer : parseInt(question.answer, 10)
+    const isCorrect = userAnswer === correctIndex
+
+    // Log the attempt to Supabase
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        await logQuestionAttempt({
+          userId: session.user.id,
+          questionId: question.id,
+          division: question.division,
+          topic: question.topic,
+          attempts: 1, // For now, always 1 per submission
+          gaveUp: false,
+          userAnswers: [userAnswer],
+          isCorrect,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to log question attempt:', err);
+    }
 
     if (isCorrect) {
       setFeedback({
@@ -104,7 +126,7 @@ export default function QuestionPage() {
     } else {
       setFeedback({
         type: 'incorrect',
-        message: `Incorrect. The correct answer is: ${question.answer}`
+        message: `Incorrect. The correct answer is: ${question.options[correctIndex]}`
       })
       setShowSolution(true)
     }
@@ -201,9 +223,9 @@ export default function QuestionPage() {
               {question.options.map((option, index) => (
                 <button
                   key={index}
-                  onClick={() => setUserAnswer(option)}
+                  onClick={() => setUserAnswer(index)}
                   className={`w-full p-4 text-left border rounded-lg transition-all duration-200 ${
-                    userAnswer === option
+                    userAnswer === index
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                   }`}
@@ -246,9 +268,9 @@ export default function QuestionPage() {
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              {!isAnswerSubmitted && userAnswer && (
+              {!isAnswerSubmitted && userAnswer !== null && (
                 <button
-                  onClick={() => handleAnswer(userAnswer)}
+                  onClick={handleAnswer}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   Submit Answer

@@ -1,37 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../utils/supabase'
-import { ProtectedRoute } from '../../components/ProtectedRoute'
-import { toast, Toaster } from 'react-hot-toast'
-import dynamic from 'next/dynamic'
-import FlagQuestion from '../components/FlagQuestion'
-import 'katex/dist/katex.min.css'
-import PracticeQuestionTable from './PracticeQuestionTable'
-
-// Lazy load BadgeDisplay to improve performance
-const BadgeDisplay = dynamic(() => import('../../components/BadgeDisplay'), {
-  loading: () => <div className="h-8 bg-gray-200 rounded animate-pulse"></div>,
-  ssr: false
-})
-
-interface Question {
-  id: string
-  question_text: string
-  options: string[]
-  answer: string
-  difficulty: number
-  level: number
-  xp_reward: number
-  accuracy_bonus: number
-  stamina_bonus: number
-  topic: string
-  division: string
-  attempts?: number
-  last_attempt?: string
-  last_correct?: boolean
-}
+import { Toaster, toast } from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import BadgeDisplay from '@/components/BadgeDisplay'
+import { Suspense } from 'react'
 
 interface StreakData {
   current_streak: number
@@ -56,28 +31,13 @@ interface UserStats {
   stamina: number
 }
 
-interface QuestionAttempt {
-  attempts: number
-  last_attempt: string
-  last_correct: boolean
-  user_answers: string[]
-  is_completed: boolean
-  gave_up: boolean
-}
-
-type PracticeMode = 'hub' | 'tests' | 'adaptive' | 'list'
+type PracticeMode = 'hub' | 'tests' | 'adaptive'
 
 export default function PracticePage() {
   const router = useRouter()
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('hub')
-  const [divisions, setDivisions] = useState<string[]>([])
-  const [topics, setTopics] = useState<string[]>([])
-  const [selectedDivision, setSelectedDivision] = useState<string>('')
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [questionHistory, setQuestionHistory] = useState<Record<string, QuestionAttempt>>({})
   const [streakData, setStreakData] = useState<StreakData | null>(null)
   const [topicCompletionCount, setTopicCompletionCount] = useState<number>(0)
   const [userStats, setUserStats] = useState<UserStats>({
@@ -88,15 +48,14 @@ export default function PracticePage() {
     stamina: 0
   })
   const [topicProgress, setTopicProgress] = useState<TopicProgress[]>([])
-  const [searchValue, setSearchValue] = useState('')
 
   // Load initial data
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         setLoading(true)
+        
         await Promise.all([
-          fetchDivisions(),
           fetchStreakData(),
           fetchTopicCompletionCount(),
           fetchUserStats(),
@@ -112,153 +71,6 @@ export default function PracticePage() {
 
     loadInitialData()
   }, [])
-
-  // Load topics when division changes
-  useEffect(() => {
-    if (selectedDivision) {
-      fetchTopics(selectedDivision)
-    } else {
-      setTopics([])
-      setSelectedTopics([])
-    }
-  }, [selectedDivision])
-
-  // Load questions when division or topics change
-  useEffect(() => {
-    if (selectedDivision && selectedTopics.length > 0) {
-      fetchQuestions()
-    } else {
-      setQuestions([])
-    }
-  }, [selectedDivision, selectedTopics])
-
-  const fetchDivisions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('division')
-        .order('division')
-
-      if (error) throw error
-
-      const uniqueDivisions = [...new Set(data?.map(q => q.division) || [])]
-      setDivisions(uniqueDivisions)
-    } catch (error) {
-      console.error('Error fetching divisions:', error)
-    }
-  }
-
-  const fetchTopics = async (division: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('questions')
-        .select('topic')
-        .eq('division', division)
-        .order('topic')
-
-      if (error) throw error
-
-      const uniqueTopics = [...new Set(data?.map(q => q.topic) || [])]
-      setTopics(uniqueTopics)
-    } catch (error) {
-      console.error('Error fetching topics:', error)
-    }
-  }
-
-  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value)
-    setSelectedTopics(selectedOptions)
-  }
-
-  const fetchQuestions = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      let query = supabase
-        .from('questions')
-        .select('id, question_text, options, answer, division, topic, difficulty, level, xp_reward, accuracy_bonus, stamina_bonus')
-        .eq('division', selectedDivision)
-
-      if (selectedTopics.length > 0) {
-        query = query.in('topic', selectedTopics)
-      }
-
-      const { data: questionsData, error: questionsError } = await query.limit(200).order('id')
-
-      if (questionsError) {
-        console.error('Error fetching questions:', questionsError)
-        throw questionsError
-      }
-
-      await fetchQuestionHistory()
-
-      if (!questionsData || questionsData.length === 0) {
-        setError('No questions available for the selected topics')
-        return
-      }
-
-      const questionsWithHistory = questionsData.map(q => ({
-        ...q,
-        completed: questionHistory[q.id]?.last_correct || false,
-        correct: questionHistory[q.id]?.last_correct || false
-      }))
-
-      setQuestions(questionsWithHistory)
-    } catch (error: any) {
-      console.error('Error fetching questions:', error)
-      setError(error.message || 'Failed to fetch questions')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchQuestionHistory = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) return
-
-      let query = supabase
-        .from('practice_attempts')
-        .select('question_id, user_answer, is_correct, created_at')
-        .eq('user_id', session.user.id)
-        .eq('division', selectedDivision)
-
-      if (selectedTopics.length > 0) {
-        query = query.in('topic', selectedTopics)
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Error fetching question history:', error)
-        return
-      }
-
-      const history: Record<string, QuestionAttempt> = {}
-      data?.forEach(attempt => {
-        if (!history[attempt.question_id]) {
-          history[attempt.question_id] = {
-            attempts: 0,
-            last_attempt: '',
-            last_correct: false,
-            user_answers: [],
-            is_completed: false,
-            gave_up: false
-          }
-        }
-        history[attempt.question_id].attempts++
-        history[attempt.question_id].last_attempt = attempt.created_at
-        history[attempt.question_id].last_correct = attempt.is_correct
-        history[attempt.question_id].user_answers.push(attempt.user_answer)
-        history[attempt.question_id].is_completed = attempt.is_correct
-      })
-
-      setQuestionHistory(history)
-    } catch (error) {
-      console.error('Error in fetchQuestionHistory:', error)
-    }
-  }
 
   const fetchStreakData = async () => {
     try {
@@ -276,13 +88,30 @@ export default function PracticePage() {
         return
       }
 
-      setStreakData(data || {
-        current_streak: 0,
-        last_practice_date: '',
-        best_streak: 0,
-        answer_streak: 0,
-        best_answer_streak: 0
-      })
+      if (data) {
+        setStreakData(data)
+      } else {
+        // Initialize streak data if it doesn't exist
+        const { data: newStreak, error: insertError } = await supabase
+          .from('user_streaks')
+          .insert([{
+            user_id: session.user.id,
+            current_streak: 0,
+            last_practice_date: null,
+            best_streak: 0,
+            answer_streak: 0,
+            best_answer_streak: 0
+          }])
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Error creating streak data:', insertError)
+          return
+        }
+
+        setStreakData(newStreak)
+      }
     } catch (error) {
       console.error('Error in fetchStreakData:', error)
     }
@@ -295,7 +124,7 @@ export default function PracticePage() {
 
       const { data, error } = await supabase
         .from('practice_attempts')
-        .select('topic')
+        .select('question_id')
         .eq('user_id', session.user.id)
         .eq('is_correct', true)
 
@@ -304,8 +133,8 @@ export default function PracticePage() {
         return
       }
 
-      const uniqueTopics = new Set(data?.map(attempt => attempt.topic) || [])
-      setTopicCompletionCount(uniqueTopics.size)
+      const uniqueQuestions = new Set(data?.map(attempt => attempt.question_id))
+      setTopicCompletionCount(uniqueQuestions.size)
     } catch (error) {
       console.error('Error in fetchTopicCompletionCount:', error)
     }
@@ -327,13 +156,30 @@ export default function PracticePage() {
         return
       }
 
-      setUserStats(data || {
-        level: 1,
-        xp: 0,
-        xp_to_next_level: 100,
-        accuracy: 0,
-        stamina: 0
-      })
+      if (data) {
+        setUserStats(data)
+      } else {
+        // Initialize user stats if they don't exist
+        const { data: newStats, error: insertError } = await supabase
+          .from('user_stats')
+          .insert([{
+            user_id: session.user.id,
+            level: 1,
+            xp: 0,
+            xp_to_next_level: 100,
+            accuracy: 0,
+            stamina: 0
+          }])
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Error creating user stats:', insertError)
+          return
+        }
+
+        setUserStats(newStats)
+      }
     } catch (error) {
       console.error('Error in fetchUserStats:', error)
     }
@@ -344,34 +190,58 @@ export default function PracticePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
 
-      const { data, error } = await supabase
-        .from('practice_attempts')
-        .select('topic, is_correct')
-        .eq('user_id', session.user.id)
+      // Get all unique topics
+      const { data: topicsData, error: topicsError } = await supabase
+        .from('questions')
+        .select('topic')
+        .order('topic')
 
-      if (error) {
-        console.error('Error fetching topic progress:', error)
+      if (topicsError) {
+        console.error('Error fetching topics:', topicsError)
         return
       }
 
-      const topicStats: Record<string, { correct: number; total: number }> = {}
-      data?.forEach(attempt => {
-        if (!topicStats[attempt.topic]) {
-          topicStats[attempt.topic] = { correct: 0, total: 0 }
+      const uniqueTopics = [...new Set(topicsData?.map(q => q.topic) || [])]
+
+      // Get user's progress for each topic
+      const progressPromises = uniqueTopics.map(async (topic) => {
+        const { data: attempts, error } = await supabase
+          .from('practice_attempts')
+          .select('question_id, is_correct')
+          .eq('user_id', session.user.id)
+          .eq('topic', topic)
+
+        if (error) {
+          console.error(`Error fetching progress for topic ${topic}:`, error)
+          return { topic, completed: 0, total: 0, status: 'not-started' as const }
         }
-        topicStats[attempt.topic].total++
-        if (attempt.is_correct) {
-          topicStats[attempt.topic].correct++
+
+        const correctAttempts = attempts?.filter(a => a.is_correct) || []
+        const uniqueCorrectQuestions = new Set(correctAttempts.map(a => a.question_id))
+        const completed = uniqueCorrectQuestions.size
+
+        // Get total questions for this topic
+        const { data: totalQuestions, error: totalError } = await supabase
+          .from('questions')
+          .select('id')
+          .eq('topic', topic)
+
+        if (totalError) {
+          console.error(`Error fetching total questions for topic ${topic}:`, totalError)
+          return { topic, completed: 0, total: 0, status: 'not-started' as const }
         }
+
+        const total = totalQuestions?.length || 0
+        let status: 'completed' | 'in-progress' | 'not-started' = 'not-started'
+        
+        if (completed > 0) {
+          status = completed === total ? 'completed' : 'in-progress'
+        }
+
+        return { topic, completed, total, status }
       })
 
-      const progress: TopicProgress[] = Object.entries(topicStats).map(([topic, stats]) => ({
-        topic,
-        completed: stats.correct,
-        total: stats.total,
-        status: stats.correct >= 10 ? 'completed' as const : stats.correct > 0 ? 'in-progress' as const : 'not-started' as const
-      }))
-
+      const progress = await Promise.all(progressPromises)
       setTopicProgress(progress)
     } catch (error) {
       console.error('Error in fetchTopicProgress:', error)
@@ -380,22 +250,28 @@ export default function PracticePage() {
 
   const checkAndAwardBadges = async (userId: string, accuracy: number) => {
     try {
-      const { data: badges } = await supabase
+      // Check if user already has the Accuracy Master badge
+      const { data: existingBadge, error: checkError } = await supabase
         .from('user_badges')
-        .select('badge_name')
+        .select('*')
         .eq('user_id', userId)
+        .eq('badge_name', 'Accuracy Master')
+        .single()
 
-      const existingBadges = badges?.map(b => b.badge_name) || []
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing badge:', checkError)
+        return
+      }
 
-      // Check for accuracy badges
-      if (accuracy >= 90 && !existingBadges.includes('Accuracy Master')) {
+      // Award badge if accuracy is high enough and user doesn't already have it
+      if (accuracy >= 0.8 && !existingBadge) {
         await supabase
           .from('user_badges')
           .insert([{
             user_id: userId,
             badge_name: 'Accuracy Master',
-            division: selectedDivision,
-            topic: selectedTopics.join(', ')
+            division: '',
+            topic: ''
           }])
 
         toast.success('🏆 New Badge: Accuracy Master!', {
@@ -540,27 +416,27 @@ export default function PracticePage() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Tests</h3>
                 <p className="text-gray-600 mb-4">
-                  Take timed tests with multiple questions to assess your knowledge
+                  Generate tests from different topics to assess knowledge
                 </p>
                 <div className="text-sm text-gray-500">
                   <div className="flex items-center justify-center mb-1">
                     <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                    <span>Timed sessions</span>
+                    <span>Full Control</span>
                   </div>
                   <div className="flex items-center justify-center mb-1">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    <span>Score tracking</span>
+                    <span>Mimic Exam Environments</span>
                   </div>
                   <div className="flex items-center justify-center">
                     <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                    <span>Performance analytics</span>
+                    <span>Print to PDF</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Adaptive Practice */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setPracticeMode('adaptive')}>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/adaptive')}>
               <div className="text-center">
                 <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -569,7 +445,7 @@ export default function PracticePage() {
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Adaptive Practice</h3>
                 <p className="text-gray-600 mb-4">
-                  AI-powered practice that adapts to your skill level and learning pace
+                  Practice that adapts to your skill level and learning pace
                 </p>
                 <div className="text-sm text-gray-500">
                   <div className="flex items-center justify-center mb-1">
@@ -589,7 +465,7 @@ export default function PracticePage() {
             </div>
 
             {/* List Practice */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setPracticeMode('list')}>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/list')}>
               <div className="text-center">
                 <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,209 +501,6 @@ export default function PracticePage() {
               <BadgeDisplay />
             </Suspense>
           </div>
-        </div>
-      </ProtectedRoute>
-    )
-  }
-
-  // Adaptive Practice View
-  if (practiceMode === 'adaptive') {
-    return (
-      <ProtectedRoute>
-        <div className="container mx-auto px-4 py-8">
-          <Toaster />
-          
-          {/* Back Button */}
-          <div className="mb-6">
-            <button
-              onClick={() => setPracticeMode('hub')}
-              className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to Practice Hub
-            </button>
-          </div>
-
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Adaptive Practice</h1>
-          
-          {/* Topic Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Topics</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Division Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Division
-                </label>
-                <select
-                  value={selectedDivision}
-                  onChange={(e) => {
-                    setSelectedDivision(e.target.value)
-                    setSelectedTopics([])
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">Select a division</option>
-                  {divisions.map((division) => (
-                    <option key={division} value={division}>
-                      {division}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Topic Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Topics (Hold Ctrl/Cmd to select multiple)
-                </label>
-                <select
-                  multiple
-                  value={selectedTopics}
-                  onChange={handleTopicChange}
-                  disabled={!selectedDivision}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white min-h-[120px]"
-                >
-                  {topics.map((topic) => (
-                    <option key={topic} value={topic}>
-                      {topic}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedTopics.length} topic(s) selected
-                </p>
-              </div>
-            </div>
-
-            {/* Start Practice Button */}
-            {selectedDivision && selectedTopics.length > 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => router.push('/practice/adaptive')}
-                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
-                >
-                  Start Adaptive Practice
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </ProtectedRoute>
-    )
-  }
-
-  // List Practice View
-  if (practiceMode === 'list') {
-    return (
-      <ProtectedRoute>
-        <div className="container mx-auto px-4 py-8">
-          <Toaster />
-          
-          {/* Back Button */}
-          <div className="mb-6">
-            <button
-              onClick={() => setPracticeMode('hub')}
-              className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to Practice Hub
-            </button>
-          </div>
-
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">List Practice</h1>
-          
-          {/* Topic Selection */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Topics</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Division Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Division
-                </label>
-                <select
-                  value={selectedDivision}
-                  onChange={(e) => {
-                    setSelectedDivision(e.target.value)
-                    setSelectedTopics([])
-                  }}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="">Select a division</option>
-                  {divisions.map((division) => (
-                    <option key={division} value={division}>
-                      {division}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Topic Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Topics (Hold Ctrl/Cmd to select multiple)
-                </label>
-                <select
-                  multiple
-                  value={selectedTopics}
-                  onChange={handleTopicChange}
-                  disabled={!selectedDivision}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white min-h-[120px]"
-                >
-                  {topics.map((topic) => (
-                    <option key={topic} value={topic}>
-                      {topic}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-sm text-gray-500 mt-1">
-                  {selectedTopics.length} topic(s) selected
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Questions Table */}
-          {selectedDivision && selectedTopics.length > 0 && questions.length > 0 && (
-            <PracticeQuestionTable
-              questions={questions}
-              questionHistory={questionHistory}
-              onFlag={(question: Question) => {
-                // Handle flagging - this could open a modal or save to database
-                console.log('Flagged question:', question.id)
-              }}
-              onAnswer={(question: Question, answer: string) => {
-                // Handle answering from the table
-                console.log('Answered question:', question.id, answer)
-              }}
-              topics={topics}
-              selectedTopics={selectedTopics}
-              setSelectedTopics={setSelectedTopics}
-              searchValue={searchValue}
-              setSearchValue={setSearchValue}
-            />
-          )}
-
-          {selectedDivision && selectedTopics.length > 0 && questions.length === 0 && !loading && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Questions Found</h3>
-              <p className="text-gray-600">
-                No questions available for the selected topics. Try selecting different topics.
-              </p>
-            </div>
-          )}
         </div>
       </ProtectedRoute>
     )
