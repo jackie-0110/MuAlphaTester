@@ -15,6 +15,7 @@ export default function Info() {
           priority
         />
       </div>
+      <p className="text-center text-gray-500">Email: <a href="mailto:jackieec956@gmail.com" className="text-blue-500 hover:text-blue-700">jackieec956@gmail.com</a> </p>
     </div>
   );
 }
