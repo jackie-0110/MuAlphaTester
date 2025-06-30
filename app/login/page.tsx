@@ -1,8 +1,28 @@
 'use client'
 
 import { LoginForm } from '../../components/AuthForm'
+import { useEffect } from 'react'
+import { supabase } from '../../utils/supabase'
 
 export default function LoginPage() {
+  useEffect(() => {
+    // Test Supabase connection
+    const testConnection = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error) {
+          console.error('Supabase connection error:', error)
+        } else {
+          console.log('Supabase connected successfully')
+        }
+      } catch (err) {
+        console.error('Failed to connect to Supabase:', err)
+      }
+    }
+    
+    testConnection()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">

@@ -1,26 +1,33 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '../../utils/supabase'
 import { ProtectedRoute } from '../../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
-import BadgeDisplay from '../../components/BadgeDisplay'
+import dynamic from 'next/dynamic'
 import FlagQuestion from '../components/FlagQuestion'
 import 'katex/dist/katex.min.css'
-import renderMathInElement from 'katex/dist/contrib/auto-render'
+import PracticeQuestionTable from './PracticeQuestionTable'
+
+// Lazy load BadgeDisplay to improve performance
+const BadgeDisplay = dynamic(() => import('../../components/BadgeDisplay'), {
+  loading: () => <div className="h-8 bg-gray-200 rounded animate-pulse"></div>,
+  ssr: false
+})
 
 interface Question {
   id: string
   question_text: string
   options: string[]
   answer: string
-  division: string
-  topic: string
   difficulty: number
   level: number
   xp_reward: number
   accuracy_bonus: number
   stamina_bonus: number
+  topic: string
+  division: string
   attempts?: number
   last_attempt?: string
   last_correct?: boolean
@@ -58,47 +65,19 @@ interface QuestionAttempt {
   gave_up: boolean
 }
 
-function KatexContent({ text }: { text: string }) {
-  const elementRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (elementRef.current) {
-      renderMathInElement(elementRef.current, {
-        delimiters: [
-          { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
-        ],
-      })
-    }
-  }, [text])
-
-  return <div ref={elementRef} dangerouslySetInnerHTML={{ __html: text }} />
-}
-
-function renderLatex(text: string) {
-  return <KatexContent text={text} />
-}
+type PracticeMode = 'hub' | 'tests' | 'adaptive' | 'list'
 
 export default function PracticePage() {
+  const router = useRouter()
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('hub')
   const [divisions, setDivisions] = useState<string[]>([])
   const [topics, setTopics] = useState<string[]>([])
   const [selectedDivision, setSelectedDivision] = useState<string>('')
-  const [selectedTopic, setSelectedTopic] = useState<string>('')
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [startTime, setStartTime] = useState<number | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
-  const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [score, setScore] = useState(0)
-  const [showResults, setShowResults] = useState(false)
-  const [practiceComplete, setPracticeComplete] = useState(false)
-  const [userAnswer, setUserAnswer] = useState<string>('')
-  const [isAnswerSubmitted, setIsAnswerSubmitted] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'correct' | 'incorrect', message: string } | null>(null)
-  const [answerStreak, setAnswerStreak] = useState(0)
-  const [bestAnswerStreak, setBestAnswerStreak] = useState(0)
   const [questionHistory, setQuestionHistory] = useState<Record<string, QuestionAttempt>>({})
-  const [showSkipOption, setShowSkipOption] = useState(false)
   const [streakData, setStreakData] = useState<StreakData | null>(null)
   const [topicCompletionCount, setTopicCompletionCount] = useState<number>(0)
   const [userStats, setUserStats] = useState<UserStats>({
@@ -109,39 +88,49 @@ export default function PracticePage() {
     stamina: 0
   })
   const [topicProgress, setTopicProgress] = useState<TopicProgress[]>([])
-  const [showSolution, setShowSolution] = useState(false)
-  const [canProgress, setCanProgress] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
 
+  // Load initial data
   useEffect(() => {
-    fetchDivisions()
-    fetchStreakData()
-    fetchUserStats()
-    fetchTopicProgress()
+    const loadInitialData = async () => {
+      try {
+        setLoading(true)
+        await Promise.all([
+          fetchDivisions(),
+          fetchStreakData(),
+          fetchTopicCompletionCount(),
+          fetchUserStats(),
+          fetchTopicProgress()
+        ])
+      } catch (error) {
+        console.error('Error loading initial data:', error)
+        setError('Failed to load initial data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadInitialData()
   }, [])
 
+  // Load topics when division changes
   useEffect(() => {
     if (selectedDivision) {
       fetchTopics(selectedDivision)
+    } else {
+      setTopics([])
+      setSelectedTopics([])
     }
   }, [selectedDivision])
 
+  // Load questions when division or topics change
   useEffect(() => {
-    if (selectedTopic) {
-      fetchTopicCompletionCount()
-    }
-  }, [selectedTopic])
-
-  useEffect(() => {
-    if (isAnswerSubmitted) {
-      document.body.classList.add('printing-mode');
+    if (selectedDivision && selectedTopics.length > 0) {
+      fetchQuestions()
     } else {
-      document.body.classList.remove('printing-mode');
+      setQuestions([])
     }
-    
-    return () => {
-      document.body.classList.remove('printing-mode');
-    };
-  }, [isAnswerSubmitted]);
+  }, [selectedDivision, selectedTopics])
 
   const fetchDivisions = async () => {
     try {
@@ -152,13 +141,10 @@ export default function PracticePage() {
 
       if (error) throw error
 
-      const uniqueDivisions = [...new Set(data.map(d => d.division))]
+      const uniqueDivisions = [...new Set(data?.map(q => q.division) || [])]
       setDivisions(uniqueDivisions)
     } catch (error) {
       console.error('Error fetching divisions:', error)
-      setError('Failed to load divisions')
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -172,192 +158,33 @@ export default function PracticePage() {
 
       if (error) throw error
 
-      const uniqueTopics = [...new Set(data.map(t => t.topic))]
+      const uniqueTopics = [...new Set(data?.map(q => q.topic) || [])]
       setTopics(uniqueTopics)
-      setSelectedTopic('')
     } catch (error) {
       console.error('Error fetching topics:', error)
-      setError('Failed to load topics')
     }
   }
 
-  const fetchQuestionHistory = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      let query = supabase
-        .from('user_progress')
-        .select('question_id, correct, timestamp')
-        .eq('user_id', user.id)
-        .eq('division', selectedDivision)
-        .order('timestamp', { ascending: false })
-        
-
-      if (selectedTopic !== 'All Topics') {
-        query = query.eq('topic', selectedTopic)
-      }
-
-      const { data, error } = await query
-
-      if (error) return
-
-      const history: Record<string, QuestionAttempt> = {}
-      data?.forEach(progress => {
-        if (!history[progress.question_id]) {
-          history[progress.question_id] = {
-            attempts: 0,
-            last_attempt: progress.timestamp,
-            last_correct: progress.correct,
-            user_answers: [],
-            is_completed: false,
-            gave_up: false
-          }
-        }
-        history[progress.question_id].attempts++
-      })
-
-      setQuestionHistory(history)
-    } catch (error) {
-      // Silently handle errors since the functionality is working
-    }
+  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value)
+    setSelectedTopics(selectedOptions)
   }
 
-  const fetchStreakData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('streak, last_practice_date')
-        .eq('id', user.id)
-        .single()
-
-      if (error) return
-
-      setStreakData({
-        current_streak: data.streak || 0,
-        last_practice_date: data.last_practice_date || '',
-        best_streak: data.streak || 0,
-        answer_streak: 0,
-        best_answer_streak: 0
-      })
-    } catch (error) {
-      // Silently handle errors since the functionality is working
-    }
-  }
-
-  const fetchTopicCompletionCount = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !selectedDivision || !selectedTopic) return
-
-      const { data, error } = await supabase
-        .from('user_progress')
-        .select('question_id')
-        .eq('user_id', user.id)
-        .eq('division', selectedDivision)
-        .eq('topic', selectedTopic)
-        .eq('correct', true)
-
-      if (error) return
-
-      setTopicCompletionCount(data?.length || 0)
-    } catch (error) {
-      // Silently handle errors since the functionality is working
-    }
-  }
-
-  const fetchUserStats = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('level, xp, accuracy, stamina')
-        .eq('id', user.id)
-        .single()
-
-      if (error) return
-
-      const currentLevel = data.level || 1
-      const currentXP = data.xp || 0
-      const xpForNextLevel = calculateXPForNextLevel(currentLevel)
-
-      setUserStats({
-        level: currentLevel,
-        xp: currentXP,
-        xp_to_next_level: xpForNextLevel,
-        accuracy: data.accuracy || 0,
-        stamina: data.stamina || 0
-      })
-    } catch (error) {
-      // Silently handle errors since the functionality is working
-    }
-  }
-
-  const fetchTopicProgress = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data, error } = await supabase
-        .from('user_progress')
-        .select('topic, correct')
-        .eq('user_id', user.id)
-
-      if (error) return
-
-      const topicStats: Record<string, { correct: number; total: number }> = {}
-      data?.forEach(progress => {
-        if (!topicStats[progress.topic]) {
-          topicStats[progress.topic] = { correct: 0, total: 0 }
-        }
-        topicStats[progress.topic].total++
-        if (progress.correct) {
-          topicStats[progress.topic].correct++
-        }
-      })
-
-      const progress = Object.entries(topicStats).map(([topic, stats]) => ({
-        topic,
-        completed: stats.correct,
-        total: stats.total,
-        status: stats.correct >= 10 ? 'completed' : stats.correct > 0 ? 'in-progress' : 'not-started'
-      }))
-
-      setTopicProgress(progress)
-    } catch (error) {
-      // Silently handle errors since the functionality is working
-    }
-  }
-
-  const calculateXPForNextLevel = (currentLevel: number) => {
-    return Math.floor(100 * Math.pow(1.5, currentLevel - 1))
-  }
-
-  const startPractice = async () => {
-    if (!selectedDivision || !selectedTopic) return
-
+  const fetchQuestions = async () => {
     try {
       setLoading(true)
       setError(null)
 
-      console.log('Starting practice with:', { selectedDivision, selectedTopic })
-
       let query = supabase
         .from('questions')
-        .select('*')
+        .select('id, question_text, options, answer, division, topic, difficulty, level, xp_reward, accuracy_bonus, stamina_bonus')
         .eq('division', selectedDivision)
-        .limit(10)
 
-      if (selectedTopic !== 'All Topics') {
-        query = query.eq('topic', selectedTopic)
+      if (selectedTopics.length > 0) {
+        query = query.in('topic', selectedTopics)
       }
 
-      const { data: questionsData, error: questionsError } = await query.order('id')
+      const { data: questionsData, error: questionsError } = await query.limit(200).order('id')
 
       if (questionsError) {
         console.error('Error fetching questions:', questionsError)
@@ -366,12 +193,8 @@ export default function PracticePage() {
 
       await fetchQuestionHistory()
 
-      console.log('Raw questions data:', JSON.stringify(questionsData, null, 2))
-      console.log('First question structure:', questionsData?.[0] ? Object.keys(questionsData[0]) : 'No questions')
-
       if (!questionsData || questionsData.length === 0) {
-        console.log('No questions found for the selected division and topic')
-        setError('No questions available for this topic')
+        setError('No questions available for the selected topics')
         return
       }
 
@@ -381,288 +204,177 @@ export default function PracticePage() {
         correct: questionHistory[q.id]?.last_correct || false
       }))
 
-      console.log('Questions with history:', questionsWithHistory)
       setQuestions(questionsWithHistory)
-      setCurrentQuestion(0)
-      setScore(0)
-      setStartTime(Date.now())
-      setShowResults(false)
-      setPracticeComplete(true)
-      setShowSkipOption(true)
-      setShowSolution(false)
-      setCanProgress(false)
-      console.log('Practice session started')
     } catch (error: any) {
-      console.error('Error in startPractice:', error)
-      setError(error.message || 'Failed to start practice')
+      console.error('Error fetching questions:', error)
+      setError(error.message || 'Failed to fetch questions')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleAnswer = async (answer: string) => {
-    if (!startTime || showResults) return
-
-    const currentQuestionData = questions[currentQuestion]
-    const isCorrect = answer === currentQuestionData.answer
-    const currentAttempts = questionHistory[currentQuestionData.id]?.attempts || 0
-    const newAttempts = currentAttempts + 1
-    
-    // Calculate XP and bonuses
-    let xpGained = currentQuestionData.xp_reward || 10
-    if (isCorrect) {
-      xpGained += currentQuestionData.accuracy_bonus || 0
-      if (answerStreak > 0) {
-        xpGained += currentQuestionData.stamina_bonus || 0
-      }
-      setScore(prev => prev + 1)
-    }
-
-    // Update answer streak
-    if (isCorrect) {
-      setAnswerStreak(prev => {
-        const newStreak = prev + 1
-        setBestAnswerStreak(current => Math.max(current, newStreak))
-        return newStreak
-      })
-    } else {
-      setAnswerStreak(0)
-    }
-
-    // Update user stats
-    const newXP = userStats.xp + xpGained
-    const newLevel = userStats.level
-    const xpForNextLevel = calculateXPForNextLevel(newLevel)
-
-    if (newXP >= xpForNextLevel) {
-      // Level up!
-      setUserStats(prev => ({
-        ...prev,
-        level: prev.level + 1,
-        xp: newXP - xpForNextLevel,
-        xp_to_next_level: calculateXPForNextLevel(prev.level + 1)
-      }))
-
-      toast.success(`Level Up! You are now level ${newLevel + 1}`)
-    } else {
-      setUserStats(prev => ({
-        ...prev,
-        xp: newXP
-      }))
-    }
-    
-    // Update question history
-    const currentHistory = questionHistory[currentQuestionData.id] || {
-      attempts: 0,
-      last_attempt: '',
-      last_correct: false,
-      user_answers: [],
-      is_completed: false,
-      gave_up: false
-    }
-
-    const updatedHistory = {
-      ...currentHistory,
-      attempts: newAttempts,
-      last_attempt: new Date().toISOString(),
-      last_correct: isCorrect,
-      user_answers: [...currentHistory.user_answers, answer],
-      is_completed: isCorrect || newAttempts >= 2
-    }
-
-    setQuestionHistory(prev => ({
-      ...prev,
-      [currentQuestionData.id]: updatedHistory
-    }))
-
-    // Show feedback and handle state
-    if (isCorrect) {
-      setFeedback({
-        type: 'correct',
-        message: `Correct! +${xpGained} XP ${answerStreak > 0 ? `(Streak: ${answerStreak + 1})` : ''}`
-      })
-      setShowSolution(true)
-      setCanProgress(true)
-      setIsAnswerSubmitted(true)
-    } else if (newAttempts >= 2) {
-      setFeedback({
-        type: 'incorrect',
-        message: `Incorrect. You've used both attempts. The correct answer is: ${currentQuestionData.answer}`
-      })
-      setShowSolution(true)
-      setCanProgress(true)
-      setIsAnswerSubmitted(true)
-    } else {
-      setFeedback({
-        type: 'incorrect',
-        message: `Incorrect. You have 1 attempt remaining.`
-      })
-      setUserAnswer('')
-      setIsAnswerSubmitted(false) // Allow second attempt
-    }
-  }
-
-  const giveUp = () => {
-    const currentQuestionData = questions[currentQuestion]
-    
-    // Update question history to mark as gave up
-    const currentHistory = questionHistory[currentQuestionData.id] || {
-      attempts: 0,
-      last_attempt: '',
-      last_correct: false,
-      user_answers: [],
-      is_completed: false,
-      gave_up: false
-    }
-
-    setQuestionHistory(prev => ({
-      ...prev,
-      [currentQuestionData.id]: {
-        ...currentHistory,
-        gave_up: true,
-        is_completed: true
-      }
-    }))
-
-    setFeedback({
-      type: 'incorrect',
-      message: `You gave up. The correct answer is: ${currentQuestionData.answer}`
-    })
-    setShowSolution(true)
-    setCanProgress(true)
-    setIsAnswerSubmitted(true)
-  }
-
-  const nextQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1)
-      setUserAnswer('')
-      setFeedback(null)
-      setIsAnswerSubmitted(false)
-      setShowSolution(false)
-      setCanProgress(false)
-    } else {
-      // End of practice session
-      try {
-        saveProgress()
-        setShowResults(true)
-      } catch (error) {
-        console.error('Failed to save progress:', error)
-        toast.error('Failed to save your progress')
-      }
-    }
-  }
-
-  const skipQuestion = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1)
-      setUserAnswer('')
-      setFeedback(null)
-      setIsAnswerSubmitted(false)
-      setShowSolution(false)
-      setCanProgress(false)
-    }
-  }
-
-  const calculatePoints = (score: number, totalQuestions: number, answerStreak: number, topicCompletionCount: number) => {
-    // Base points for correct answers (10 points per correct answer)
-    const correctAnswerPoints = score * 10
-
-    // Bonus points for accuracy (up to 50 points)
-    const accuracy = (score / totalQuestions) * 100
-    const accuracyBonus = Math.floor(accuracy / 2) // 50 points for 100% accuracy
-
-    // Streak bonus (5 points per streak level, up to 50 points)
-    const streakBonus = Math.min(answerStreak * 5, 50)
-
-    // Topic completion bonus (2 points per completion, up to 20 points)
-    const completionBonus = Math.min(topicCompletionCount * 2, 20)
-
-    return correctAnswerPoints + accuracyBonus + streakBonus + completionBonus
-  }
-
-  const saveProgress = async () => {
-    if (!selectedDivision || !selectedTopic) {
-      console.log('Cannot save progress: missing division or topic')
-      return
-    }
-
+  const fetchQuestionHistory = async () => {
     try {
-      // Get the current user session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError) {
-        throw new Error('Authentication error: ' + sessionError.message)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+
+      let query = supabase
+        .from('practice_attempts')
+        .select('question_id, user_answer, is_correct, created_at')
+        .eq('user_id', session.user.id)
+        .eq('division', selectedDivision)
+
+      if (selectedTopics.length > 0) {
+        query = query.in('topic', selectedTopics)
       }
 
-      if (!session?.user) {
-        throw new Error('No authenticated user found')
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Error fetching question history:', error)
+        return
       }
 
-      const user = session.user
-      const sessionId = Math.random().toString(36).substring(2, 15) // Generate a unique session ID
-
-      // Save each question attempt individually
-      for (let i = 0; i < questions.length; i++) {
-        const question = questions[i]
-        const questionAttempt = questionHistory[question.id]
-        
-        if (questionAttempt) {
-          const { error: attemptError } = await supabase
-            .from('practice_attempts')
-            .insert([{
-              user_id: user.id,
-              question_id: question.id,
-              user_answer: questionAttempt.user_answers[questionAttempt.user_answers.length - 1] || '',
-              is_correct: questionAttempt.last_correct,
-              session_id: sessionId,
-              division: selectedDivision,
-              topic: selectedTopic
-            }])
-
-          if (attemptError) {
-            console.error('Error saving question attempt:', attemptError)
-            throw attemptError
+      const history: Record<string, QuestionAttempt> = {}
+      data?.forEach(attempt => {
+        if (!history[attempt.question_id]) {
+          history[attempt.question_id] = {
+            attempts: 0,
+            last_attempt: '',
+            last_correct: false,
+            user_answers: [],
+            is_completed: false,
+            gave_up: false
           }
         }
+        history[attempt.question_id].attempts++
+        history[attempt.question_id].last_attempt = attempt.created_at
+        history[attempt.question_id].last_correct = attempt.is_correct
+        history[attempt.question_id].user_answers.push(attempt.user_answer)
+        history[attempt.question_id].is_completed = attempt.is_correct
+      })
+
+      setQuestionHistory(history)
+    } catch (error) {
+      console.error('Error in fetchQuestionHistory:', error)
+    }
+  }
+
+  const fetchStreakData = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+
+      const { data, error } = await supabase
+        .from('user_streaks')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching streak data:', error)
+        return
       }
 
-      // Update leaderboard with aggregated data
-      const totalQuestions = questions.length
-      const correctAnswers = Object.values(questionHistory).filter(h => h.last_correct).length
-      const accuracy = (correctAnswers / totalQuestions) * 100
+      setStreakData(data || {
+        current_streak: 0,
+        last_practice_date: '',
+        best_streak: 0,
+        answer_streak: 0,
+        best_answer_streak: 0
+      })
+    } catch (error) {
+      console.error('Error in fetchStreakData:', error)
+    }
+  }
 
-      const leaderboardEntry = {
-        user_id: user.id,
-        username: user.user_metadata?.username || 'Anonymous',
-        division: selectedDivision,
-        topic: selectedTopic,
-        grade_level: user.user_metadata?.grade_level || 'Unknown',
-        average_score: accuracy,
-        attempts: totalQuestions,
-        perfect_scores: accuracy === 100 ? 1 : 0,
-        last_updated: new Date().toISOString()
+  const fetchTopicCompletionCount = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+
+      const { data, error } = await supabase
+        .from('practice_attempts')
+        .select('topic')
+        .eq('user_id', session.user.id)
+        .eq('is_correct', true)
+
+      if (error) {
+        console.error('Error fetching topic completion count:', error)
+        return
       }
 
-      const { error: leaderboardError } = await supabase
-        .from('leaderboard')
-        .upsert([leaderboardEntry], {
-          onConflict: 'user_id,division,topic'
-        })
+      const uniqueTopics = new Set(data?.map(attempt => attempt.topic) || [])
+      setTopicCompletionCount(uniqueTopics.size)
+    } catch (error) {
+      console.error('Error in fetchTopicCompletionCount:', error)
+    }
+  }
 
-      if (leaderboardError) {
-        console.error('Error updating leaderboard:', leaderboardError)
-        // Don't throw error here as progress was saved successfully
+  const fetchUserStats = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+
+      const { data, error } = await supabase
+        .from('user_stats')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching user stats:', error)
+        return
       }
 
-      // Refresh user data
-      await fetchStreakData()
-      await fetchTopicCompletionCount()
-      
-      toast.success('Progress saved successfully!')
-    } catch (error: any) {
-      console.error('Error saving progress:', error)
-      toast.error(error.message || 'Failed to save progress')
+      setUserStats(data || {
+        level: 1,
+        xp: 0,
+        xp_to_next_level: 100,
+        accuracy: 0,
+        stamina: 0
+      })
+    } catch (error) {
+      console.error('Error in fetchUserStats:', error)
+    }
+  }
+
+  const fetchTopicProgress = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+
+      const { data, error } = await supabase
+        .from('practice_attempts')
+        .select('topic, is_correct')
+        .eq('user_id', session.user.id)
+
+      if (error) {
+        console.error('Error fetching topic progress:', error)
+        return
+      }
+
+      const topicStats: Record<string, { correct: number; total: number }> = {}
+      data?.forEach(attempt => {
+        if (!topicStats[attempt.topic]) {
+          topicStats[attempt.topic] = { correct: 0, total: 0 }
+        }
+        topicStats[attempt.topic].total++
+        if (attempt.is_correct) {
+          topicStats[attempt.topic].correct++
+        }
+      })
+
+      const progress: TopicProgress[] = Object.entries(topicStats).map(([topic, stats]) => ({
+        topic,
+        completed: stats.correct,
+        total: stats.total,
+        status: stats.correct >= 10 ? 'completed' as const : stats.correct > 0 ? 'in-progress' as const : 'not-started' as const
+      }))
+
+      setTopicProgress(progress)
+    } catch (error) {
+      console.error('Error in fetchTopicProgress:', error)
     }
   }
 
@@ -683,7 +395,7 @@ export default function PracticePage() {
             user_id: userId,
             badge_name: 'Accuracy Master',
             division: selectedDivision,
-            topic: selectedTopic
+            topic: selectedTopics.join(', ')
           }])
 
         toast.success('🏆 New Badge: Accuracy Master!', {
@@ -717,357 +429,409 @@ export default function PracticePage() {
     )
   }
 
-  return (
-    <ProtectedRoute>
-      <div className="container mx-auto px-4 py-8">
-        <Toaster />
-        
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Practice</h1>
-            {selectedDivision && selectedTopic && (
-              <p className="text-lg text-gray-600">
-                {selectedDivision} - {selectedTopic}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold">
-              {userStats.level}
+  // Hub View
+  if (practiceMode === 'hub') {
+    return (
+      <ProtectedRoute>
+        <div className="container mx-auto px-4 py-8">
+          <Toaster />
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6">
+              {error}
             </div>
-            <div>
-              <p className="text-sm text-gray-500">XP to level {userStats.level + 1}</p>
-              <div className="w-48 h-2 bg-gray-200 rounded-full">
-                <div 
-                  className="h-full bg-blue-600 rounded-full"
-                  style={{ width: `${(userStats.xp / userStats.xp_to_next_level) * 100}%` }}
-                />
+          )}
+
+          {/* Header Section */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Practice Hub</h1>
+                <p className="text-lg text-gray-600 mt-2">
+                  Choose your practice mode and start learning
+                </p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="bg-blue-600 text-white rounded-full w-12 h-12 flex items-center justify-center text-xl font-bold">
+                  {userStats.level}
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Level {userStats.level}</p>
+                  <div className="w-32 h-2 bg-gray-200 rounded-full">
+                    <div 
+                      className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                      style={{ width: `${(userStats.xp / userStats.xp_to_next_level) * 100}%` }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+              {streakData && (
+                <>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Current Streak</p>
+                        <p className="text-2xl font-bold text-gray-900">{streakData.current_streak}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Answer Streak</p>
+                        <p className="text-2xl font-bold text-gray-900">{streakData.answer_streak}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">Completed</p>
+                        <p className="text-2xl font-bold text-gray-900">{topicCompletionCount}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-500">XP Earned</p>
+                        <p className="text-2xl font-bold text-gray-900">{userStats.xp}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Practice Mode Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Tests */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/tests')}>
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Tests</h3>
+                <p className="text-gray-600 mb-4">
+                  Take timed tests with multiple questions to assess your knowledge
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span>Timed sessions</span>
+                  </div>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Score tracking</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Performance analytics</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Adaptive Practice */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setPracticeMode('adaptive')}>
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Adaptive Practice</h3>
+                <p className="text-gray-600 mb-4">
+                  AI-powered practice that adapts to your skill level and learning pace
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Adaptive difficulty</span>
+                  </div>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span>Spaced repetition</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Progress tracking</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List Practice */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => setPracticeMode('list')}>
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">List Practice</h3>
+                <p className="text-gray-600 mb-4">
+                  Browse and practice questions by topic with full control over selection
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Topic filtering</span>
+                  </div>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span>Search questions</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Individual practice</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Badge Display */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Badges</h3>
+            <Suspense fallback={<div className="h-8 bg-gray-200 rounded animate-pulse"></div>}>
+              <BadgeDisplay />
+            </Suspense>
           </div>
         </div>
+      </ProtectedRoute>
+    )
+  }
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Topic Selection Panel */}
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-lg shadow-lg">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Topic</h2>
-              
-              {/* Add streak display */}
-              {streakData && (
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h3 className="text-sm font-medium text-blue-800 mb-2">Your Streaks</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-2xl font-bold text-blue-600">{streakData.current_streak}</p>
-                      <p className="text-xs text-blue-500">Practice Streak</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-blue-600">{streakData.best_streak}</p>
-                      <p className="text-xs text-blue-500">Best Practice Streak</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-blue-600">{answerStreak}</p>
-                      <p className="text-xs text-blue-500">Current Answer Streak</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-blue-600">{streakData.best_answer_streak}</p>
-                      <p className="text-xs text-blue-500">Best Answer Streak</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+  // Adaptive Practice View
+  if (practiceMode === 'adaptive') {
+    return (
+      <ProtectedRoute>
+        <div className="container mx-auto px-4 py-8">
+          <Toaster />
+          
+          {/* Back Button */}
+          <div className="mb-6">
+            <button
+              onClick={() => setPracticeMode('hub')}
+              className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Practice Hub
+            </button>
+          </div>
 
-              {/* Add topic completion count */}
-              {selectedTopic && (
-                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h3 className="text-sm font-medium text-green-800 mb-2">Topic Progress</h3>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-2xl font-bold text-green-600">{topicCompletionCount}</p>
-                      <p className="text-xs text-green-500">Questions Completed</p>
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-green-600">
-                        {Math.min(Math.floor((topicCompletionCount / 10) * 100), 100)}%
-                      </p>
-                      <p className="text-xs text-green-500">Topic Mastery</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Add BadgeDisplay */}
-              <div className="mb-6">
-                <BadgeDisplay />
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">Adaptive Practice</h1>
+          
+          {/* Topic Selection */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Topics</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Division Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Division
+                </label>
+                <select
+                  value={selectedDivision}
+                  onChange={(e) => {
+                    setSelectedDivision(e.target.value)
+                    setSelectedTopics([])
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">Select a division</option>
+                  {divisions.map((division) => (
+                    <option key={division} value={division}>
+                      {division}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Division
-              </label>
-              <select
-                value={selectedDivision}
-                    onChange={(e) => {
-                      setSelectedDivision(e.target.value)
-                      setSelectedTopic('')
-                      setPracticeComplete(false)
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select a division</option>
-                {divisions.map((division) => (
-                      <option key={division} value={division}>
-                        {division}
-                  </option>
-                ))}
-              </select>
+              {/* Topic Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Topics (Hold Ctrl/Cmd to select multiple)
+                </label>
+                <select
+                  multiple
+                  value={selectedTopics}
+                  onChange={handleTopicChange}
+                  disabled={!selectedDivision}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white min-h-[120px]"
+                >
+                  {topics.map((topic) => (
+                    <option key={topic} value={topic}>
+                      {topic}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedTopics.length} topic(s) selected
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Topic
-              </label>
-              <select
-                    value={selectedTopic}
-                    onChange={(e) => {
-                      setSelectedTopic(e.target.value)
-                      setPracticeComplete(false)
-                    }}
-                    disabled={!selectedDivision}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Select a topic</option>
-                    {topics.map((topic) => (
-                      <option key={topic} value={topic}>
-                        {topic}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Start Practice Button */}
+            {selectedDivision && selectedTopics.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => router.push('/practice/adaptive')}
+                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
+                >
+                  Start Adaptive Practice
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
+  }
 
-                {selectedDivision && selectedTopic && (
-                  <button
-                    onClick={startPractice}
-                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    {practiceComplete ? 'Restart Practice' : 'Start Practice'}
-                  </button>
-                )}
+  // List Practice View
+  if (practiceMode === 'list') {
+    return (
+      <ProtectedRoute>
+        <div className="container mx-auto px-4 py-8">
+          <Toaster />
+          
+          {/* Back Button */}
+          <div className="mb-6">
+            <button
+              onClick={() => setPracticeMode('hub')}
+              className="flex items-center text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to Practice Hub
+            </button>
+          </div>
+
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">List Practice</h1>
+          
+          {/* Topic Selection */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Topics</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Division Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Division
+                </label>
+                <select
+                  value={selectedDivision}
+                  onChange={(e) => {
+                    setSelectedDivision(e.target.value)
+                    setSelectedTopics([])
+                  }}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                >
+                  <option value="">Select a division</option>
+                  {divisions.map((division) => (
+                    <option key={division} value={division}>
+                      {division}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Topic Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Topics (Hold Ctrl/Cmd to select multiple)
+                </label>
+                <select
+                  multiple
+                  value={selectedTopics}
+                  onChange={handleTopicChange}
+                  disabled={!selectedDivision}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed bg-white min-h-[120px]"
+                >
+                  {topics.map((topic) => (
+                    <option key={topic} value={topic}>
+                      {topic}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedTopics.length} topic(s) selected
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Practice Area */}
-          <div className="lg:col-span-2">
-            {practiceComplete ? (
-              showResults ? (
-                <div className="bg-white p-6 rounded-lg shadow-lg">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-4">Practice Results</h2>
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div>
-                      <p className="text-sm text-gray-500">Score</p>
-                      <p className="text-2xl font-bold text-gray-900">{score}/{questions.length}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">XP Earned</p>
-                      <p className="text-2xl font-bold text-blue-600">+{userStats.xp}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Best Streak</p>
-                      <p className="text-2xl font-bold text-gray-900">{answerStreak}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Topic Completions</p>
-                      <p className="text-2xl font-bold text-gray-900">{topicCompletionCount}</p>
-                    </div>
-                  </div>
-          <button
-                    onClick={() => {
-                      setPracticeComplete(false)
-                      setShowResults(false)
-                    }}
-                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Try Again
-          </button>
-                </div>
-              ) : (
-                <div className="bg-white p-6 rounded-lg shadow-lg">
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center space-x-4">
-                        <div className="text-sm text-gray-500">
-                          Question {currentQuestion + 1} of {questions.length}
-                        </div>
-                        <div className="text-blue-600">
-                          +{questions[currentQuestion]?.xp_reward || 10} XP
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        Accuracy +{questions[currentQuestion]?.accuracy_bonus || 0}
-                        {answerStreak > 0 && `, Stamina +${questions[currentQuestion]?.stamina_bonus || 0}`}
-                </div>
+          {/* Questions Table */}
+          {selectedDivision && selectedTopics.length > 0 && questions.length > 0 && (
+            <PracticeQuestionTable
+              questions={questions}
+              questionHistory={questionHistory}
+              onFlag={(question: Question) => {
+                // Handle flagging - this could open a modal or save to database
+                console.log('Flagged question:', question.id)
+              }}
+              onAnswer={(question: Question, answer: string) => {
+                // Handle answering from the table
+                console.log('Answered question:', question.id, answer)
+              }}
+              topics={topics}
+              selectedTopics={selectedTopics}
+              setSelectedTopics={setSelectedTopics}
+              searchValue={searchValue}
+              setSearchValue={setSearchValue}
+            />
+          )}
+
+          {selectedDivision && selectedTopics.length > 0 && questions.length === 0 && !loading && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               </div>
-
-                    {questions[currentQuestion] && (
-                      <>
-                        {questionHistory[questions[currentQuestion].id] && (
-                          <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
-                            <p className="text-sm">
-                              Previous attempts: {questionHistory[questions[currentQuestion].id].attempts}
-                              {questionHistory[questions[currentQuestion].id].last_correct && ' (Last attempt was correct)'}
-                            </p>
-              </div>
-                        )}
-                        <p className="text-lg font-medium text-gray-900 mb-4">
-                          {renderLatex(questions[currentQuestion].question_text)}
-                        </p>
-                        
-                        {/* Flag button */}
-                        <div className="mb-4 flex justify-end">
-                          <FlagQuestion 
-                            questionId={questions[currentQuestion].id}
-                            questionText={questions[currentQuestion].question_text}
-                          />
-                        </div>
-                        
-                        <div className="space-y-4">
-                          {questions[currentQuestion].options && questions[currentQuestion].options.length > 0 && (
-                            <div className="space-y-2">
-                              {questions[currentQuestion].options.map((option, index) => (
-                                <div key={index} className="flex items-center space-x-2">
-                                  <span className="font-medium">{String.fromCharCode(65 + index)}.</span>
-                                  <span>{renderLatex(option)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          
-                          {/* Attempt counter */}
-                          <div className="text-sm text-gray-600">
-                            Attempts: {questionHistory[questions[currentQuestion].id]?.attempts || 0}/2
-                          </div>
-
-                          <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !isAnswerSubmitted && userAnswer.trim()) {
-                                  handleAnswer(userAnswer)
-                                }
-                              }}
-                              placeholder="Type your answer here..."
-                              className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                              disabled={isAnswerSubmitted}
-                            />
-                            <button
-                              onClick={() => handleAnswer(userAnswer)}
-                              disabled={isAnswerSubmitted || !userAnswer.trim()}
-                              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Submit
-                            </button>
-                </div>
-
-                          {/* Give up button - show after first attempt */}
-                          {questionHistory[questions[currentQuestion].id]?.attempts === 1 && !isAnswerSubmitted && (
-                            <button
-                              onClick={giveUp}
-                              className="w-full px-4 py-2 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 transition-colors border border-red-200 rounded-md"
-                            >
-                              Give Up
-                            </button>
-                          )}
-
-                          {/* Skip option */}
-                          {showSkipOption && !isAnswerSubmitted && (
-                            <button
-                              onClick={skipQuestion}
-                              className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                            >
-                              Skip this question
-                            </button>
-                          )}
-
-                          {/* Feedback */}
-                          {feedback && (
-                  <div className={`p-4 rounded-lg ${
-                              feedback.type === 'correct' 
-                                ? 'bg-green-50 text-green-700 border border-green-200' 
-                                : 'bg-red-50 text-red-700 border border-red-200'
-                            }`}>
-                              {renderLatex(feedback.message)}
-                            </div>
-                          )}
-
-                          {/* Solution dropdown */}
-                          {showSolution && (
-                            <div className="mt-4">
-                              <details className="bg-gray-50 rounded-lg">
-                                <summary className="p-4 cursor-pointer font-medium text-gray-900 hover:bg-gray-100">
-                                  View Solution
-                                </summary>
-                                <div className="p-4 border-t border-gray-200">
-                                  <p className="text-sm text-gray-600 mb-2">Correct Answer:</p>
-                                  <p className="font-medium text-gray-900">
-                                    {renderLatex(questions[currentQuestion].answer)}
-                                  </p>
-                                  {questionHistory[questions[currentQuestion].id]?.user_answers.length > 0 && (
-                                    <div className="mt-3">
-                                      <p className="text-sm text-gray-600 mb-1">Your attempts:</p>
-                                      <ul className="text-sm text-gray-700">
-                                        {questionHistory[questions[currentQuestion].id].user_answers.map((answer, index) => (
-                                          <li key={index} className="flex items-center space-x-2">
-                                            <span>Attempt {index + 1}:</span>
-                                            <span className="font-mono">{answer}</span>
-                                            <span className={answer === questions[currentQuestion].answer ? 'text-green-600' : 'text-red-600'}>
-                                              {answer === questions[currentQuestion].answer ? '✓' : '✗'}
-                                            </span>
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              </details>
-                            </div>
-                          )}
-
-                          {/* Next question button */}
-                          {canProgress && (
-                            <button
-                              onClick={nextQuestion}
-                              className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                            >
-                              {currentQuestion === questions.length - 1 ? 'Finish Practice' : 'Next Question'}
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )
-            ) : (
-              <div className="bg-white p-6 rounded-lg shadow-lg">
-                <div className="text-center text-gray-500">
-                  <p className="text-lg">Select a division and topic to start practicing</p>
-              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Questions Found</h3>
+              <p className="text-gray-600">
+                No questions available for the selected topics. Try selecting different topics.
+              </p>
             </div>
           )}
         </div>
-      </div>
-    </div>
-    </ProtectedRoute>
-  )
+      </ProtectedRoute>
+    )
+  }
+
+  return null
 } 

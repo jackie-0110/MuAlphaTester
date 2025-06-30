@@ -18,16 +18,24 @@ export function LoginForm() {
     setError(null)
     
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting login with email:', email)
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      if (error) throw error
+      if (error) {
+        console.error('Login error:', error)
+        throw error
+      }
       
-      // Redirect to practice page after successful login
-      router.push('/practice')
+      console.log('Login successful:', data)
+      
+      // Redirect to home page after successful login
+      router.push('/tests')
     } catch (error: any) {
+      console.error('Login error details:', error)
       setError(error.message || 'An error occurred during login')
     } finally {
       setLoading(false)

@@ -75,8 +75,9 @@ export function Navbar() {
                     }`}
                   >
                     Practice
-                  </Link>
-                  <Link
+                  </Link> 
+                  {/*
+                   <Link 
                     href="/tests"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                       isActive('/tests')
@@ -85,7 +86,8 @@ export function Navbar() {
                     }`}
                   >
                     Tests
-                  </Link>
+                  </Link> 
+                  */}
                   <Link
                     href="/leaderboard"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${

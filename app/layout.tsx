@@ -4,11 +4,15 @@ import './globals.css'
 import { AuthProvider } from '../contexts/AuthContext'
 import { Navbar } from '../components/Navbar'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap', // Improve font loading performance
+})
 
 export const metadata: Metadata = {
-  title: 'FAMA Tester',
-  description: 'Practice and test your FAMA knowledge',
+  title: 'FAMATester - Math Practice Platform',
+  description: 'Master math concepts through adaptive practice sessions',
+  viewport: 'width=device-width, initial-scale=1',
 }
 
 export default function RootLayout({
@@ -17,7 +21,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={inter.className}>
+      <head>
+        {/* Preload critical resources */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
           <Navbar />
