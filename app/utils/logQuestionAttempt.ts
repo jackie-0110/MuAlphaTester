@@ -8,6 +8,7 @@ export async function logQuestionAttempt({
   attempts,
   gaveUp,
   userAnswers,
+  isCorrect,
 }: {
   userId: string;
   questionId: string;
@@ -16,6 +17,7 @@ export async function logQuestionAttempt({
   attempts: number;
   gaveUp: boolean;
   userAnswers: string[];
+  isCorrect?: boolean;
 }) {
   const { error } = await supabase.from('question_attempts').insert([
     {
@@ -26,6 +28,7 @@ export async function logQuestionAttempt({
       attempts,
       gave_up: gaveUp,
       user_answers: userAnswers,
+      is_correct: isCorrect || false,
     },
   ]);
   if (error) throw error;

@@ -437,8 +437,8 @@ export default function AdaptivePracticePage() {
       if (!session?.user) return
 
       let query = supabase
-        .from('practice_attempts')
-        .select('question_id, user_answer, is_correct, created_at')
+        .from('question_attempts')
+        .select('question_id, user_answers, is_correct, created_at')
         .eq('user_id', session.user.id)
         .eq('division', selectedDivision)
 
@@ -468,7 +468,19 @@ export default function AdaptivePracticePage() {
         history[attempt.question_id].attempts++
         history[attempt.question_id].last_attempt = attempt.created_at
         history[attempt.question_id].last_correct = attempt.is_correct
-        history[attempt.question_id].user_answers.push(attempt.user_answer)
+        
+        // Handle user_answers as jsonb
+        if (attempt.user_answers) {
+          if (Array.isArray(attempt.user_answers)) {
+            history[attempt.question_id].user_answers.push(...attempt.user_answers.map(String))
+          } else if (typeof attempt.user_answers === 'object') {
+            const answers = Object.values(attempt.user_answers).map(String)
+            history[attempt.question_id].user_answers.push(...answers)
+          } else {
+            history[attempt.question_id].user_answers.push(String(attempt.user_answers))
+          }
+        }
+        
         history[attempt.question_id].is_completed = attempt.is_correct
       })
 
@@ -499,6 +511,7 @@ export default function AdaptivePracticePage() {
           attempts: newAttempts,
           gaveUp: false,
           userAnswers: [String(userAnswer)],
+          isCorrect,
         });
       }
     } catch (err) {

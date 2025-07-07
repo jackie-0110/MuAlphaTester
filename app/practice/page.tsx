@@ -210,93 +210,93 @@ export default function PracticePage() {
                 <p className="text-lg text-gray-600 mt-2">
                   Choose your practice mode and start learning
                 </p>
+            </div>
+          </div>
+
+          {/* Practice Mode Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            {/* Tests */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/tests')}>
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Tests</h3>
+                <p className="text-gray-600 mb-4">
+                    Generate tests from different topics to assess knowledge
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                      <span>Full Control</span>
+                  </div>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                      <span>Mimic Exam Environments</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                      <span>Print to PDF</span>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Practice Mode Selection */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              {/* Tests */}
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/tests')}>
-                <div className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Tests</h3>
-                  <p className="text-gray-600 mb-4">
-                    Generate tests from different topics to assess knowledge
-                  </p>
-                  <div className="text-sm text-gray-500">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                      <span>Full Control</span>
-                    </div>
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      <span>Mimic Exam Environments</span>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                      <span>Print to PDF</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Adaptive Practice */}
+            {/* Adaptive Practice */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/adaptive')}>
-                <div className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Adaptive Practice</h3>
-                  <p className="text-gray-600 mb-4">
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Adaptive Practice</h3>
+                <p className="text-gray-600 mb-4">
                     Practice that adapts to your skill level and learning pace
-                  </p>
-                  <div className="text-sm text-gray-500">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      <span>Adaptive difficulty</span>
-                    </div>
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                      <span>Spaced repetition</span>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                      <span>Progress tracking</span>
-                    </div>
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Adaptive difficulty</span>
+                  </div>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span>Spaced repetition</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Progress tracking</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* List Practice */}
+            {/* List Practice */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/list')}>
-                <div className="text-center">
-                  <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                    </svg>
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">List Practice</h3>
+                <p className="text-gray-600 mb-4">
+                  Browse and practice questions by topic with full control over selection
+                </p>
+                <div className="text-sm text-gray-500">
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
+                    <span>Topic filtering</span>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">List Practice</h3>
-                  <p className="text-gray-600 mb-4">
-                    Browse and practice questions by topic with full control over selection
-                  </p>
-                  <div className="text-sm text-gray-500">
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-purple-500 rounded-full mr-2"></div>
-                      <span>Topic filtering</span>
-                    </div>
-                    <div className="flex items-center justify-center mb-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                      <span>Search questions</span>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                      <span>Individual practice</span>
+                  <div className="flex items-center justify-center mb-1">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                    <span>Search questions</span>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Individual practice</span>
                     </div>
                   </div>
                 </div>

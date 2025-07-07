@@ -211,7 +211,7 @@ export default function ListPracticePage() {
 
       // Query practice_attempts to get all attempts for this user, division, and topics
       let query = supabase
-        .from('practice_attempts')
+        .from('question_attempts')
         .select('question_id, is_correct')
         .eq('user_id', session.user.id)
         .eq('division', selectedDivision)

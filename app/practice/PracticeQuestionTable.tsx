@@ -62,6 +62,10 @@ export default function PracticeQuestionTable({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        // Calculate if the answer is correct
+        const correctIndex = typeof question.answer === 'number' ? question.answer : parseInt(question.answer, 10)
+        const isCorrect = answer === String(correctIndex)
+        
         await logQuestionAttempt({
           userId: session.user.id,
           questionId: question.id,
@@ -70,6 +74,7 @@ export default function PracticeQuestionTable({
           attempts: 1, // For now, always 1 per submission
           gaveUp: false,
           userAnswers: [answer],
+          isCorrect,
         });
       }
     } catch (err) {
