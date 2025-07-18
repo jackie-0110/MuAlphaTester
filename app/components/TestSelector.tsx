@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../utils/supabase'
-import { AutocompleteInput } from '../../components/AutocompleteInput'
+import { AutocompleteInput } from './AutocompleteInput'
 
 interface TestSelectorProps {
   onSelect: (selection: { division: string; topic: string | null }) => void
@@ -16,7 +16,7 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Fetch divisions and topics
+  // fetch divisions and topics
   useEffect(() => {
     fetchDivisions()
   }, [])
@@ -39,7 +39,7 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
 
       const uniqueDivisions = [...new Set(data.map((d: { division: string }) => d.division))].sort()
       setDivisions(uniqueDivisions)
-      // Set the first division as selected by default
+      // set the first division as selected by default
       if (uniqueDivisions.length > 0) {
         setSelectedDivision(uniqueDivisions[0])
         fetchTopics(uniqueDivisions[0])
@@ -68,14 +68,14 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
     }
   }
 
-  // Handle division selection
+  // handle division selection
   const handleDivisionSelect = (division: string) => {
     setSelectedDivision(division)
     setSelectedTopic(null)
     onSelect({ division, topic: null })
   }
 
-  // Handle topic selection
+  // handle topic selection
   const handleTopicSelect = (topic: string) => {
     setSelectedTopic(topic)
     onSelect({ 
@@ -86,7 +86,7 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Division Selection */}
+              {/* division selection */}
       <AutocompleteInput
         label="Division"
         placeholder="Select a division..."
@@ -101,7 +101,7 @@ export function TestSelector({ onSelect, className = '' }: TestSelectorProps) {
         allowCustomValue={false}
       />
 
-      {/* Topic Selection */}
+              {/* topic selection */}
       <AutocompleteInput
         label="Topic"
         placeholder="Select a topic (or leave empty for all)"

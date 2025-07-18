@@ -1,12 +1,12 @@
 'use client'
 
-import { LoginForm } from '../../components/AuthForm'
+import { LoginForm } from '../components/AuthForm'
 import { useEffect } from 'react'
 import { supabase } from '../../utils/supabase'
 
 export default function LoginPage() {
   useEffect(() => {
-    // Test Supabase connection
+    // test supabase connection
     const testConnection = async () => {
       try {
         const { data, error } = await supabase.auth.getSession()

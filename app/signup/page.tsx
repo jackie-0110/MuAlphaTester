@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { LoginForm, SignUpForm } from '../../components/AuthForm';
-import { AuthProvider } from '../famat-tester/context/AuthContext'
+import { LoginForm, SignUpForm } from '../components/AuthForm';
+import { AuthProvider } from '../../contexts/AuthContext'
 
 export default function AuthPage() {
   return (

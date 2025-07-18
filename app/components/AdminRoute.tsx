@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { checkAdminStatus } from '../utils/adminUtils'
+import { checkAdminStatus } from '../../utils/adminUtils'
 
 interface AdminRouteProps {
   children: React.ReactNode

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
 
 interface UserAchievement {

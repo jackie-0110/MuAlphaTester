@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ProtectedRoute } from '../../components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { TestSelector } from '../components/TestSelector'
 import { TestQuestions } from '../components/TestQuestions'
 

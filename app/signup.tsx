@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import Navbar from "../components/Navbar";
-import { LoginForm, SignUpForm } from '../components/AuthForm'
+import { Navbar } from "./components/Navbar";
+import { LoginForm, SignUpForm } from './components/AuthForm'
 
 export default function AuthPage() {
   return (
@@ -16,5 +16,4 @@ export default function AuthPage() {
       </main>
     </div>
   )
-}
 }

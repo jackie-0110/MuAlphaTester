@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
-import { AutocompleteInput } from '../../components/AutocompleteInput'
-import { IncrementalSearch } from '../../components/IncrementalSearch'
+import { AutocompleteInput } from '../components/AutocompleteInput'
+import { IncrementalSearch } from '../components/IncrementalSearch'
 
 interface FriendRequest {
   id: string
@@ -82,7 +82,7 @@ export default function FriendsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get accepted friend relationships where current user is either requester or recipient
+      // get accepted friend relationships where current user is either requester or recipient
       const { data, error } = await supabase
         .from('friend_relationships')
         .select(`
@@ -95,7 +95,7 @@ export default function FriendsPage() {
 
       if (error) throw error
 
-      // Transform data to get friend profiles
+      // transform data to get friend profiles
       const friendProfiles: Friend[] = data?.map(relationship => {
         const friend = relationship.requester_id === user.id 
           ? relationship.recipient 
@@ -121,7 +121,7 @@ export default function FriendsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get pending requests where current user is recipient
+      // get pending requests where current user is recipient
       const { data: receivedRequests, error: receivedError } = await supabase
         .from('friend_relationships')
         .select(`
@@ -133,7 +133,7 @@ export default function FriendsPage() {
 
       if (receivedError) throw receivedError
 
-      // Get pending requests where current user is requester
+      // get pending requests where current user is requester
       const { data: sentRequests, error: sentError } = await supabase
         .from('friend_relationships')
         .select(`
@@ -157,10 +157,10 @@ export default function FriendsPage() {
 
   const searchUsers = async (query: string) => {
     try {
-      console.log('Searching for:', query) // Debug log
+      console.log('Searching for:', query) // debug log
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        console.log('No authenticated user') // Debug log
+                  console.log('No authenticated user') // debug log
         return []
       }
 
@@ -172,13 +172,13 @@ export default function FriendsPage() {
         .limit(10)
 
       if (error) {
-        console.error('Supabase error:', error) // Debug log
+        console.error('Supabase error:', error) // debug log
         throw error
       }
 
-      // If no results with specific search, try a broader search
+              // if no results with specific search, try a broader search
       if (!data || data.length === 0) {
-        console.log('No specific results, trying broader search') // Debug log
+                  console.log('No specific results, trying broader search') // debug log
         const { data: broaderData, error: broaderError } = await supabase
           .from('users')
           .select('id, username, grade_level, total_points, friend_count')
@@ -186,15 +186,15 @@ export default function FriendsPage() {
           .limit(10)
 
         if (broaderError) {
-          console.error('Broader search error:', broaderError) // Debug log
+          console.error('Broader search error:', broaderError) // debug log
           throw broaderError
         }
 
         data = broaderData
-        console.log('Broader search results:', data) // Debug log
+                  console.log('Broader search results:', data) // debug log
       }
 
-      console.log('Final search results:', data) // Debug log
+              console.log('Final search results:', data) // debug log
 
       const formattedResults = (data || []).map(user => ({
         id: user.id,
@@ -206,7 +206,7 @@ export default function FriendsPage() {
         friend_count: user.friend_count
       }))
 
-      console.log('Formatted results:', formattedResults) // Debug log
+              console.log('Formatted results:', formattedResults) // debug log
       return formattedResults
     } catch (err) {
       console.error('Error searching users:', err)
@@ -216,11 +216,11 @@ export default function FriendsPage() {
   }
 
   const handleUserSelect = (user: any) => {
-    // Handle user selection - could open a profile modal or navigate to profile
+    // handle user selection - could open a profile modal or navigate to profile
     console.log('Selected user:', user)
   }
 
-  // Test function to check if there are any users in the database
+      // test function to check if there are any users in the database
   const testUserFetch = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -229,7 +229,7 @@ export default function FriendsPage() {
         return
       }
 
-      // Test 1: Get all users
+              // test 1: get all users
       const { data: allUsers, error: allError } = await supabase
         .from('users')
         .select('*')
@@ -237,7 +237,7 @@ export default function FriendsPage() {
 
       console.log('All users test:', { allUsers, allError })
 
-      // Test 2: Get current user
+              // test 2: get current user
       const { data: currentUserData, error: currentError } = await supabase
         .from('users')
         .select('*')
@@ -246,7 +246,7 @@ export default function FriendsPage() {
 
       console.log('Current user test:', { currentUserData, currentError })
 
-      // Test 3: Get users excluding current user
+              // test 3: get users excluding current user
       const { data: otherUsers, error: otherError } = await supabase
         .from('users')
         .select('*')
@@ -349,7 +349,7 @@ export default function FriendsPage() {
           <p className="text-gray-600">Connect with other students and compete together</p>
         </div>
 
-        {/* Current User Stats */}
+        {/* current user stats */}
         {currentUser && (
           <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
@@ -374,7 +374,7 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* Tab Navigation */}
+        {/* tab navigation */}
         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
           <button
             onClick={() => setActiveTab('friends')}
@@ -408,7 +408,7 @@ export default function FriendsPage() {
           </button>
         </div>
 
-        {/* Content */}
+        {/* content */}
         <div className="bg-white rounded-lg shadow">
           {loading ? (
             <div className="p-6">
@@ -462,7 +462,7 @@ export default function FriendsPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Friend Requests</h3>
                   
-                  {/* Received Requests */}
+                  {/* received requests */}
                   {pendingRequests.length > 0 && (
                     <div className="mb-6">
                       <h4 className="text-md font-medium text-gray-700 mb-3">Received Requests</h4>
@@ -500,7 +500,7 @@ export default function FriendsPage() {
                     </div>
                   )}
 
-                  {/* Sent Requests */}
+                  {/* sent requests */}
                   {sentRequests.length > 0 && (
                     <div>
                       <h4 className="text-md font-medium text-gray-700 mb-3">Sent Requests</h4>
@@ -539,7 +539,7 @@ export default function FriendsPage() {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Find Friends</h3>
                   
-                  {/* Test Button */}
+                  {/* test button */}
                   <div className="mb-4">
                     <button
                       onClick={testUserFetch}
@@ -549,7 +549,7 @@ export default function FriendsPage() {
                     </button>
                   </div>
                   
-                  {/* Incremental Search */}
+                  {/* incremental search */}
                   <div className="mb-6">
                     <IncrementalSearch
                       label="Search Users"

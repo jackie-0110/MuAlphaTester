@@ -75,7 +75,7 @@ export default function FlagQuestion({ questionId, questionText, onFlagged }: Fl
 
   return (
     <div className="relative">
-      {/* Flag Button */}
+              {/* flag button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="inline-flex items-center px-3 py-1 text-sm text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
@@ -87,7 +87,7 @@ export default function FlagQuestion({ questionId, questionText, onFlagged }: Fl
         Flag
       </button>
 
-      {/* Modal */}
+              {/* modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -104,13 +104,13 @@ export default function FlagQuestion({ questionId, questionText, onFlagged }: Fl
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Question Preview */}
+              {/* question preview */}
               <div className="bg-gray-50 p-3 rounded-md">
                 <p className="text-sm text-gray-600 mb-1">Question:</p>
                 <p className="text-sm text-gray-900 line-clamp-3">{questionText}</p>
               </div>
 
-              {/* Flag Type */}
+                              {/* flag type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Issue Type *
@@ -130,7 +130,7 @@ export default function FlagQuestion({ questionId, questionText, onFlagged }: Fl
                 </select>
               </div>
 
-              {/* Description */}
+                              {/* description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Additional Details (Optional)
@@ -144,7 +144,7 @@ export default function FlagQuestion({ questionId, questionText, onFlagged }: Fl
                 />
               </div>
 
-              {/* Buttons */}
+                              {/* buttons */}
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"

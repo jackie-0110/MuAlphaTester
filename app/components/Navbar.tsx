@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../utils/supabase'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'

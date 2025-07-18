@@ -136,8 +136,8 @@ export function TestQuestions() {
         numProblems
       })
 
-      // Fetch more questions than needed to ensure we have enough to randomize
-      const fetchCount = Math.min(numProblems * 3, 100); // Limit to 100 max for performance
+      // fetch more questions than needed to ensure we have enough to randomize
+      const fetchCount = Math.min(numProblems * 3, 100); // limit to 100 max for performance
       
       let query = supabase
         .from('questions')
@@ -170,14 +170,14 @@ export function TestQuestions() {
         question_text: question.question_text || '',
       }))
 
-      // Randomize the questions using Fisher-Yates shuffle algorithm
+      // randomize the questions using fisher-yates shuffle algorithm
       const shuffledQuestions = [...validatedQuestions];
       for (let i = shuffledQuestions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
       }
 
-      // Take only the number of problems requested
+      // take only the number of problems requested
       const selectedQuestions = shuffledQuestions.slice(0, numProblems);
 
       console.log('Randomized questions:', selectedQuestions)
@@ -206,10 +206,10 @@ export function TestQuestions() {
   const handlePrint = () => {
     setIsPrinting(true);
     
-    // Use setTimeout to ensure the state updates before printing
+          // use setTimeout to ensure the state updates before printing
     setTimeout(() => {
       window.print();
-      // Return to normal view after print dialog closes
+      // return to normal view after print dialog closes
       setTimeout(() => {
         setIsPrinting(false);
       }, 500);
@@ -218,13 +218,13 @@ export function TestQuestions() {
 
   return (
     <div className="space-y-8">
-      {/* Only show controls when not printing */}
+              {/* only show controls when not printing */}
       {!isPrinting && (
         <div className="bg-white p-6 rounded-lg shadow-lg">
           <h2 className="text-2xl font-bold mb-6">Generate Problem Set</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            {/* Division Selection */}
+            {/* division selection */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Division</h3>
               <select
@@ -241,7 +241,7 @@ export function TestQuestions() {
               </select>
             </div>
 
-            {/* Topic Selection - Multiple Select */}
+                          {/* topic selection - multiple select */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Topics (Hold Ctrl/Cmd to select multiple)</h3>
               <select
@@ -263,7 +263,7 @@ export function TestQuestions() {
             </div>
           </div>
 
-          {/* Difficulty Range Slider */}
+                      {/* difficulty range slider */}
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2">Difficulty range</h3>
             <div className="relative h-2 mb-8">
@@ -300,7 +300,7 @@ export function TestQuestions() {
             </div>
           </div>
 
-          {/* Number of Problems Slider */}
+                      {/* number of problems slider */}
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-2"># of problems</h3>
             <div className="flex items-center space-x-4">
@@ -319,7 +319,7 @@ export function TestQuestions() {
             </div>
           </div>
 
-          {/* Generate Button */}
+                      {/* generate button */}
           <button
             onClick={fetchQuestions}
             disabled={!selectedDivision || selectedTopics.length === 0}
@@ -330,21 +330,21 @@ export function TestQuestions() {
         </div>
       )}
 
-      {/* Loading State */}
+              {/* loading state */}
       {loading && !questions.length && !isPrinting && (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
         </div>
       )}
 
-      {/* Error State */}
+              {/* error state */}
       {error && !isPrinting && (
         <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Questions Display */}
+              {/* questions display */}
       {Array.isArray(questions) && questions.length > 0 ? (
         <div className={`printable-test ${isPrinting ? 'print-view' : 'bg-white p-6 rounded-lg shadow-lg'}`}>
           <div className="mb-8 flex justify-between items-center">
@@ -355,7 +355,7 @@ export function TestQuestions() {
               </p>
             </div>
             
-            {/* Print Button - Only show when not in printing mode */}
+            {/* print button - only show when not in printing mode */}
             {!isPrinting && (
               <button
                 onClick={handlePrint}

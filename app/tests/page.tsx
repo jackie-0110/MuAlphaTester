@@ -1,6 +1,6 @@
 'use client'
 
-import { ProtectedRoute } from '../../components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { TestQuestions } from '../components/TestQuestions'
 
 export default function TestPage() {

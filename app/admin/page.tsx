@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { checkAdminStatus } from '../../utils/adminUtils'
-import AdminRoute from '../../components/AdminRoute'
+import AdminRoute from '../components/AdminRoute'
 
 export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Quick Stats Section */}
+              {/* quick stats section */}
       <div className="mt-12 bg-white rounded-lg shadow-lg p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Stats</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -23,7 +23,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen overflow-hidden">
-      {/* Animated Background */}
+      {/* animated background with floating blobs */}
       <div className="fixed inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50"></div>
         <div className="absolute top-0 left-0 w-96 h-96 bg-blue-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
@@ -31,15 +31,15 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-pink-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
 
-      {/* Hero Section */}
+      {/* main hero section */}
       <section className="relative min-h-screen flex items-center justify-center px-4">
         <div className="max-w-7xl mx-auto text-center">
-          {/* Floating Elements */}
+          {/* floating decorative elements */}
           <div className="absolute top-20 left-10 w-20 h-20 bg-blue-200 rounded-full opacity-60 animate-bounce"></div>
           <div className="absolute top-40 right-20 w-16 h-16 bg-purple-200 rounded-full opacity-60 animate-bounce animation-delay-1000"></div>
           <div className="absolute bottom-40 left-20 w-12 h-12 bg-pink-200 rounded-full opacity-60 animate-bounce animation-delay-2000"></div>
           
-          {/* Main Content */}
+          {/* main content area */}
           <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <div className="relative">
               <h1 className="text-5xl sm:text-7xl font-bold text-gray-900 mb-6 leading-tight">
@@ -57,7 +57,7 @@ export default function Home() {
               <span className="font-semibold text-purple-600">intelligent learning</span>
             </p>
 
-                         {/* Interactive CTA Buttons */}
+                         {/* call to action buttons */}
              <div className="flex justify-center items-center mb-16">
                <Link
                  href="/signup"
@@ -68,7 +68,7 @@ export default function Home() {
                </Link>
              </div>
 
-            {/* Animated Progress Steps */}
+            {/* animated progress indicators */}
             <div className="max-w-md mx-auto">
               <div className="flex justify-center space-x-4 mb-4">
                 {steps.map((step, index) => (
@@ -92,7 +92,7 @@ export default function Home() {
         </div>
       </section>
 
-             {/* Interactive Features Section */}
+             {/* features showcase section */}
        <section className="relative py-20 bg-white">
          <div className="max-w-7xl mx-auto px-4">
            <div className="text-center mb-16">
@@ -105,7 +105,7 @@ export default function Home() {
            </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Column - Interactive Demo */}
+            {/* left column with feature cards */}
             <div className="space-y-8">
               <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8 border border-gray-100 shadow-lg">
                 <div className="flex items-center space-x-4 mb-6">
@@ -117,7 +117,7 @@ export default function Home() {
                   <h3 className="text-2xl font-bold text-gray-900">Adaptive Learning</h3>
                 </div>
                                  <p className="text-gray-600 leading-relaxed">
-                   Practice with questions specifically designed for MAΘ competitions, with difficulty levels that match real tournament challenges.
+                   Practice that adapts to your level based on your performance.
                  </p>
               </div>
 
@@ -136,7 +136,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right Column - Visual Elements */}
+            {/* right column with progress demo */}
             <div className="relative">
               <div className="relative z-10 bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
                 <div className="space-y-6">
@@ -161,7 +161,7 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Floating Elements */}
+              {/* floating accent elements */}
               <div className="absolute -top-4 -right-4 w-8 h-8 bg-yellow-400 rounded-full animate-pulse"></div>
               <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-green-400 rounded-full animate-pulse animation-delay-1000"></div>
             </div>
@@ -169,7 +169,7 @@ export default function Home() {
         </div>
       </section>
 
-             {/* Call to Action */}
+             {/* final call to action */}
        <section className="relative py-20 bg-gradient-to-r from-blue-600 to-purple-600 overflow-hidden">
          <div className="absolute inset-0 bg-black opacity-10"></div>
          <div className="relative max-w-4xl mx-auto text-center px-4">
@@ -177,7 +177,7 @@ export default function Home() {
              Ready to Excel in MAΘ?
            </h2>
            <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-             Start practicing with questions designed specifically for Mu Alpha Theta competitions.
+             Start practicing with questions from past Mu Alpha Theta competitions.
            </p>
            <div className="flex justify-center">
              <Link

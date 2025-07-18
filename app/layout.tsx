@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '../contexts/AuthContext'
-import { Navbar } from '../components/Navbar'
+import { Navbar } from './components/Navbar'
 
 const inter = Inter({ 
   subsets: ['latin'],
-  display: 'swap', // Improve font loading performance
+  display: 'swap', // better font loading
 })
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.className}>
       <head>
-        {/* Preload critical resources */}
+        {/* preload fonts and resources */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />

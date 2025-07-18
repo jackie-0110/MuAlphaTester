@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../utils/supabase'
 import { toast, Toaster } from 'react-hot-toast'
-import AdminRoute from '../../../components/AdminRoute'
+import AdminRoute from '../../components/AdminRoute'
 import { getAdminUsers, updateUserRole } from '../../../utils/adminUtils'
 
 interface User {
@@ -28,7 +28,7 @@ export default function AdminUsersPage() {
     try {
       setLoading(true)
       
-      // Get all users from users table
+      // get all users from users table
       const { data, error } = await supabase
         .from('users')
         .select('id, username, role, created_at')
@@ -103,7 +103,7 @@ export default function AdminUsersPage() {
           <p className="text-gray-600">Manage user roles and permissions</p>
         </div>
 
-        {/* Filters */}
+        {/* filters */}
         <div className="bg-white p-6 rounded-lg shadow-lg mb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

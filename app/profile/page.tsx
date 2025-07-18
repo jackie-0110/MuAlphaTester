@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../utils/supabase'
-import { ProtectedRoute } from '../../components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../../contexts/AuthContext'
-import Badges from '@/components/Badges'
+import Badges from '../components/Badges'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import FlagQuestion from '../components/FlagQuestion'

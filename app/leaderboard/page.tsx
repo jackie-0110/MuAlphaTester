@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
 
 interface LeaderboardEntry {
@@ -176,7 +176,7 @@ export default function Leaderboard() {
           <p className="text-gray-600">Compete with other students and track your progress</p>
         </div>
 
-        {/* Current User Stats */}
+        {/* current user stats */}
         {currentUser && (
           <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
@@ -207,7 +207,7 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* Tab Navigation */}
+        {/* tab navigation */}
         <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
           <button
             onClick={() => setActiveTab('topic')}
@@ -231,7 +231,7 @@ export default function Leaderboard() {
           </button>
         </div>
 
-        {/* Filters - Only show for topic leaderboard */}
+        {/* filters - only show for topic leaderboard */}
         {activeTab === 'topic' && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <div className="flex flex-col md:flex-row gap-4">
@@ -292,7 +292,7 @@ export default function Leaderboard() {
           </div>
         )}
 
-        {/* Leaderboard Content */}
+        {/* leaderboard content */}
         <div className="bg-white rounded-lg shadow">
         {loading ? (
             <div className="p-6">

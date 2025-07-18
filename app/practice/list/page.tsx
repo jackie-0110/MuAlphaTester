@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { ProtectedRoute } from '../../components/ProtectedRoute'
 import PracticeQuestionTable from '../PracticeQuestionTable'
 
 interface Question {

@@ -31,11 +31,11 @@ export default function PracticeQuestionTable({
   const [page, setPage] = useState(1)
   const pageSize = 10
 
-  // Debug logging
+      // debug logging
   console.log('PracticeQuestionTable received questionHistory:', questionHistory)
   console.log('PracticeQuestionTable received questions:', questions.length)
 
-  // Filter and search
+      // filter and search
   const filtered = useMemo(() => {
     let q = questions
     if (selectedTopics.length > 0) {
@@ -62,7 +62,7 @@ export default function PracticeQuestionTable({
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Calculate if the answer is correct
+        // calculate if the answer is correct
         const correctIndex = typeof question.answer === 'number' ? question.answer : parseInt(question.answer, 10)
         const isCorrect = answer === String(correctIndex)
         
@@ -71,7 +71,7 @@ export default function PracticeQuestionTable({
           questionId: question.id,
           division: question.division,
           topic: question.topic,
-          attempts: 1, // For now, always 1 per submission
+          attempts: 1, // for now, always 1 per submission
           gaveUp: false,
           userAnswers: [answer],
           isCorrect,
@@ -80,7 +80,7 @@ export default function PracticeQuestionTable({
     } catch (err) {
       console.error('Failed to log question attempt:', err);
     }
-    // Call the original onAnswer prop if needed
+            // call the original onAnswer prop if needed
     onAnswer(question, answer);
   };
 
@@ -98,9 +98,9 @@ export default function PracticeQuestionTable({
         </div>
       </div>
       
-      {/* Table */}
+              {/* table */}
       <div className="overflow-hidden">
-        {/* Table header */}
+        {/* table header */}
         <div className="grid grid-cols-5 gap-4 px-6 py-3 text-sm font-semibold text-gray-600 border-b border-gray-100 bg-gray-50">
           <div>Question</div>
           <div>Topic</div>
@@ -109,7 +109,7 @@ export default function PracticeQuestionTable({
           <div>Actions</div>
         </div>
         
-        {/* Table rows */}
+        {/* table rows */}
         {paginated.map((q, i) => (
           <div
             key={q.id}
@@ -142,7 +142,7 @@ export default function PracticeQuestionTable({
                   lastCorrect: history?.last_correct
                 })
                 
-                // If no history exists, question is unattempted
+                // if no history exists, question is unattempted
                 if (!history) {
                   return (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -151,7 +151,7 @@ export default function PracticeQuestionTable({
                   )
                 }
                 
-                // If history exists and any attempt was correct, question is solved
+                // if history exists and any attempt was correct, question is solved
                 if (history.is_completed) {
                   return (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -160,7 +160,7 @@ export default function PracticeQuestionTable({
                   )
                 }
                 
-                // If history exists but no correct attempts, question was attempted but wrong
+                // if history exists but no correct attempts, question was attempted but wrong
                 return (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                     Attempted
@@ -181,7 +181,7 @@ export default function PracticeQuestionTable({
         )}
       </div>
       
-      {/* Pagination */}
+              {/* pagination */}
       {totalPages > 1 && (
         <div className="flex justify-between items-center px-6 py-4 border-t border-gray-200">
           <button

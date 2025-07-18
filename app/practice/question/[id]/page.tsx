@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '../../../../utils/supabase'
-import { ProtectedRoute } from '../../../../components/ProtectedRoute'
+import { ProtectedRoute } from '../../../components/ProtectedRoute'
 import { toast, Toaster } from 'react-hot-toast'
 import FlagQuestion from '../../../components/FlagQuestion'
 import 'katex/dist/katex.min.css'

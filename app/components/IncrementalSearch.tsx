@@ -45,7 +45,7 @@ export function IncrementalSearch({
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // Debounced search function
+  // debounced search function
   const debouncedSearch = useCallback(async (searchQuery: string) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current)
@@ -73,7 +73,7 @@ export function IncrementalSearch({
     }, debounceMs)
   }, [onSearch, minChars, maxResults, debounceMs])
 
-  // Handle input changes
+  // handle input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value
     setQuery(newQuery)
@@ -87,7 +87,7 @@ export function IncrementalSearch({
     }
   }
 
-  // Handle keyboard navigation
+  // handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!isOpen || results.length === 0) return
 
@@ -129,7 +129,7 @@ export function IncrementalSearch({
     setHighlightedIndex(-1)
   }
 
-  // Handle click outside
+  // handle click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -141,7 +141,7 @@ export function IncrementalSearch({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Cleanup debounce timeout on unmount
+  // cleanup debounce timeout on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
@@ -150,7 +150,7 @@ export function IncrementalSearch({
     }
   }, [])
 
-  // Default result renderer
+  // default result renderer
   const defaultRenderResult = (result: SearchResult, isHighlighted: boolean) => (
     <div className={`p-3 ${isHighlighted ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'}`}>
       <div className="font-medium text-gray-900">{result.title}</div>
@@ -213,7 +213,7 @@ export function IncrementalSearch({
         <p className="mt-1 text-sm text-red-600">{error}</p>
       )}
 
-      {/* Search Results */}
+      {/* search results */}
       {isOpen && results.length > 0 && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
           {results.map((result, index) => (
@@ -229,14 +229,14 @@ export function IncrementalSearch({
         </div>
       )}
 
-      {/* No Results */}
+              {/* no results */}
       {isOpen && query.length >= minChars && results.length === 0 && !isLoading && !error && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
           <p>No results found for "{query}"</p>
         </div>
       )}
 
-      {/* Search Instructions */}
+              {/* search instructions */}
       {isOpen && query.length < minChars && !isLoading && (
         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-center text-gray-500">
           <p>Type at least {minChars} characters to search</p>

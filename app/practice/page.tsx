@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Toaster, toast } from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
-import { ProtectedRoute } from '@/components/ProtectedRoute'
-import BadgeDisplay from '@/components/BadgeDisplay'
+import { ProtectedRoute } from '../components/ProtectedRoute'
+import BadgeDisplay from '../components/BadgeDisplay'
 import { Suspense } from 'react'
 
 interface TopicProgress {
@@ -25,7 +25,7 @@ export default function PracticePage() {
   const [topicCompletionCount, setTopicCompletionCount] = useState<number>(0)
   const [topicProgress, setTopicProgress] = useState<TopicProgress[]>([])
 
-  // Load initial data
+  // load initial data
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -74,7 +74,7 @@ export default function PracticePage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
 
-      // Get all unique topics
+      // get all unique topics
       const { data: topicsData, error: topicsError } = await supabase
         .from('questions')
         .select('topic')
@@ -87,7 +87,7 @@ export default function PracticePage() {
 
       const uniqueTopics = [...new Set(topicsData?.map(q => q.topic) || [])]
 
-      // Get user's progress for each topic
+      // get user's progress for each topic
       const progressPromises = uniqueTopics.map(async (topic) => {
         const { data: attempts, error } = await supabase
           .from('practice_attempts')
@@ -104,7 +104,7 @@ export default function PracticePage() {
         const uniqueCorrectQuestions = new Set(correctAttempts.map(a => a.question_id))
         const completed = uniqueCorrectQuestions.size
 
-        // Get total questions for this topic
+        // get total questions for this topic
         const { data: totalQuestions, error: totalError } = await supabase
           .from('questions')
           .select('id')
@@ -134,7 +134,7 @@ export default function PracticePage() {
 
   const checkAndAwardBadges = async (userId: string, accuracy: number) => {
     try {
-      // Check if user already has the Accuracy Master badge
+      // check if user already has the accuracy master badge
       const { data: existingBadge, error: checkError } = await supabase
         .from('user_badges')
         .select('*')
@@ -147,7 +147,7 @@ export default function PracticePage() {
         return
       }
 
-      // Award badge if accuracy is high enough and user doesn't already have it
+      // award badge if accuracy is high enough and user doesn't already have it
       if (accuracy >= 0.8 && !existingBadge) {
         await supabase
           .from('user_badges')
@@ -167,7 +167,7 @@ export default function PracticePage() {
         })
       }
     } catch (error) {
-      // Silently handle errors since the functionality is working
+      // silently handle errors since the functionality is working
     }
   }
 
@@ -202,7 +202,7 @@ export default function PracticePage() {
             </div>
           )}
 
-          {/* Header Section */}
+          {/* header section */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -213,9 +213,9 @@ export default function PracticePage() {
             </div>
           </div>
 
-          {/* Practice Mode Selection */}
+                      {/* practice mode selection */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Tests */}
+                          {/* tests section */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/tests')}>
               <div className="text-center">
                 <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
@@ -244,7 +244,7 @@ export default function PracticePage() {
               </div>
             </div>
 
-            {/* Adaptive Practice */}
+                          {/* adaptive practice section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/adaptive')}>
               <div className="text-center">
                 <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
@@ -273,7 +273,7 @@ export default function PracticePage() {
               </div>
             </div>
 
-            {/* List Practice */}
+                          {/* list practice section */}
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push('/practice/list')}>
               <div className="text-center">
                 <div className="mx-auto w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mb-4">
@@ -304,7 +304,7 @@ export default function PracticePage() {
             </div>
           </div>
 
-          {/* Badge Display */}
+                      {/* badge display */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Badges</h3>
             <Suspense fallback={<div className="h-8 bg-gray-200 rounded animate-pulse"></div>}>

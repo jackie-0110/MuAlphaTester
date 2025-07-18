@@ -1,4 +1,4 @@
-import { EmailVerificationSuccess } from '../components/AuthForm'
+import { EmailVerificationSuccess } from '../app/components/AuthForm'
 
 export default function VerifyEmailPage() {
   return (
