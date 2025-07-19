@@ -1,7 +1,7 @@
 'use client';
 
 
-import Info from '@/components/Info';
+import Info from '../components/Info';
 // import Link from 'next/link';
 
 export default function FeaturesPage() {
