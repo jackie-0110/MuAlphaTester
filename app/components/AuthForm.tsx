@@ -49,7 +49,7 @@ export function LoginForm() {
           <span className="text-white font-bold text-xl">F</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-        <p className="text-gray-600 mt-2">Sign in to your FAMATester account</p>
+        <p className="text-gray-600 mt-2">Sign in to your Mu Alpha Tester account</p>
       </div>
       
       {error && (
@@ -234,7 +234,7 @@ export function SignUpForm() {
           <span className="text-white font-bold text-xl">F</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-900">Create Account</h2>
-        <p className="text-gray-600 mt-2">Join FAMATester today</p>
+        <p className="text-gray-600 mt-2">Join Mu Alpha Tester today</p>
       </div>
       
       {error && (
@@ -364,7 +364,7 @@ export function EmailVerificationSuccess() {
       </div>
       
       <div className="bg-green-50 border border-green-200 text-green-600 p-4 rounded-lg mb-6">
-        <p>You can now sign in to your account and start using FAMATester.</p>
+        <p>You can now sign in to your account and start using Mu Alpha Tester.</p>
       </div>
       
       <div className="text-center">

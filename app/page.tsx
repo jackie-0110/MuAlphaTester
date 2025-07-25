@@ -16,7 +16,7 @@ export default function Home() {
   }, []);
 
   const steps = [
-    { title: "Practice", icon: "📚", description: "Master FAMAT concepts" },
+    { title: "Practice", icon: "📚", description: "Master MAΘ concepts" },
     { title: "Adapt", icon: "🧠", description: "Learn at your pace" },
     { title: "Excel", icon: "🏆", description: "Achieve your goals" }
   ];
@@ -44,7 +44,7 @@ export default function Home() {
             <div className="relative">
               <h1 className="text-5xl sm:text-7xl font-bold text-gray-900 mb-6 leading-tight">
                 <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  FAMAT
+                  MAΘ
                 </span>
                 <br />
                 <span className="text-3xl sm:text-5xl text-gray-700">Training Platform</span>
@@ -97,7 +97,7 @@ export default function Home() {
          <div className="max-w-7xl mx-auto px-4">
            <div className="text-center mb-16">
              <h2 className="text-4xl font-bold text-gray-900 mb-4">
-               Built for Mu Alpha Theta
+               Built for MAΘ
              </h2>
              <p className="text-xl text-gray-600 max-w-2xl mx-auto">
                The first dedicated training platform designed specifically for MAΘ competition preparation
@@ -177,7 +177,7 @@ export default function Home() {
              Ready to Excel in MAΘ?
            </h2>
            <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
-             Start practicing with questions from past Mu Alpha Theta competitions.
+             Start practicing with questions from past MAΘ competitions.
            </p>
            <div className="flex justify-center">
              <Link

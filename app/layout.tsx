@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'FAMATester - Math Practice Platform',
+  title: 'Mu Alpha Tester - Math Practice Platform',
   description: 'Master math concepts through adaptive practice sessions',
   viewport: 'width=device-width, initial-scale=1',
 }
