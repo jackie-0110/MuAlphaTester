@@ -178,7 +178,7 @@ export default function Leaderboard() {
 
         {/* current user stats */}
         {currentUser && (
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6 mb-8">
+          <div className="bg-blue-600 text-white rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold mb-2">Your Stats</h2>

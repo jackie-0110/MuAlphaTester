@@ -559,7 +559,7 @@ export default function ProfilePage() {
             <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
               <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center space-x-6">
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                  <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-bold text-3xl">
                       {profile?.username?.[0]?.toUpperCase() || '?'}
                     </span>

@@ -135,7 +135,7 @@ export default function AchievementsPage() {
 
         {/* Current User Stats */}
         {currentUser && (
-          <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg p-6 mb-8">
+          <div className="bg-gray-800 text-white rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold mb-2">Your Achievement Stats</h2>
@@ -170,7 +170,7 @@ export default function AchievementsPage() {
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div 
-              className="bg-gradient-to-r from-purple-500 to-pink-600 h-3 rounded-full transition-all duration-500"
+              className="bg-blue-600 h-3 rounded-full transition-all duration-500"
               style={{ width: `${stats.completion_percentage}%` }}
             />
           </div>

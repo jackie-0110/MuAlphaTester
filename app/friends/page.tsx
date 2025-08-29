@@ -351,7 +351,7 @@ export default function FriendsPage() {
 
         {/* current user stats */}
         {currentUser && (
-          <div className="bg-gradient-to-r from-green-500 to-blue-600 text-white rounded-lg p-6 mb-8">
+          <div className="bg-green-600 text-white rounded-lg p-6 mb-8">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-semibold mb-2">Your Social Stats</h2>

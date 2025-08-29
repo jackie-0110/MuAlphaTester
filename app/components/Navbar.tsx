@@ -88,7 +88,7 @@ export function Navbar() {
                     Tests
                   </Link> 
                   */}
-                  <Link
+                  {/* <Link
                     href="/leaderboard"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                       isActive('/leaderboard')
@@ -97,7 +97,7 @@ export function Navbar() {
                     }`}
                   >
                     Leaderboard
-                  </Link>
+                  </Link> */}
                   <Link
                     href="/achievements"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
@@ -120,7 +120,7 @@ export function Navbar() {
                       Admin
                     </Link>
                   )}
-                  <Link
+                  {/*<Link
                     href="/contact"
                     className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
                       isActive('/contact')
@@ -129,7 +129,7 @@ export function Navbar() {
                     }`}
                   >
                     Contact
-                  </Link>
+                  </Link> */}
                 </>
               )}
             </div>
